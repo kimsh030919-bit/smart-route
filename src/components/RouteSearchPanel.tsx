@@ -1,5 +1,16 @@
-import { useState } from 'react';
-import { ArrowRightLeft, Calendar, Clock, Flag, Loader2, Navigation, Search, Target } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import {
+  ArrowRightLeft,
+  Calendar,
+  Check,
+  Clock,
+  Flag,
+  Loader2,
+  Navigation,
+  Search,
+  Target,
+  X,
+} from 'lucide-react';
 import type { Category, Origin, RouteSearchParams, TransportMode } from '../types';
 import { CATEGORY_LIST } from '../data/categories';
 import { MODE_LIST } from '../lib/travel';
@@ -19,13 +30,28 @@ interface Props {
 type Field = 'origin' | 'destination';
 
 export function RouteSearchPanel({ params, onChange, onSearch, loading, canSearchPlaces }: Props) {
-  const [query, setQuery] = useState<Record<Field, string>>({ origin: '', destination: '' });
+  // 검색칸에는 현재 설정된 출발지/도착지 이름이 그대로 보이게 한다
+  const [query, setQuery] = useState<Record<Field, string>>({
+    origin: params.origin.name,
+    destination: params.destination.name,
+  });
   const [results, setResults] = useState<{ field: Field; items: Origin[] } | null>(null);
   const [searching, setSearching] = useState<Field | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const patch = (p: Partial<RouteSearchParams>) => onChange({ ...params, ...p });
   const support = describeSupport(params.mode);
+
+  // 예시 경로 선택 · 출발지↔도착지 교환 등으로 값이 바뀌면 입력칸도 따라 바뀐다
+  useEffect(() => {
+    setQuery((q) => (q.origin === params.origin.name ? q : { ...q, origin: params.origin.name }));
+  }, [params.origin]);
+
+  useEffect(() => {
+    setQuery((q) =>
+      q.destination === params.destination.name ? q : { ...q, destination: params.destination.name },
+    );
+  }, [params.destination]);
 
   async function runSearch(field: Field, e: React.FormEvent) {
     e.preventDefault();
@@ -55,54 +81,102 @@ export function RouteSearchPanel({ params, onChange, onSearch, loading, canSearc
     patch({ categories: [...set] });
   };
 
-  const renderPoint = (field: Field, label: string, icon: React.ReactNode, value: Origin) => (
-    <div>
-      <span className="label flex items-center gap-1.5">
-        {icon}
-        {label}
-      </span>
-      <form onSubmit={(e) => runSearch(field, e)} className="flex gap-2">
-        <input
-          className="input"
-          placeholder={canSearchPlaces ? '예) 진주시청, 진주성' : '예시 경로를 사용해 주세요'}
-          value={query[field]}
-          onChange={(e) => setQuery((q) => ({ ...q, [field]: e.target.value }))}
-        />
-        <button
-          type="submit"
-          className="btn-secondary shrink-0 px-3"
-          disabled={searching !== null || !canSearchPlaces}
-          aria-label={`${label} 검색`}
-        >
-          {searching === field ? <Loader2 size={16} className="animate-spin" /> : <Search size={16} />}
-        </button>
-      </form>
-      <p className="mt-1.5 truncate text-[12.5px] text-navy-500">
-        현재: <strong className="font-semibold text-navy-800">{value.name}</strong>
-        <span className="text-navy-400"> · {value.address}</span>
-      </p>
-      {results?.field === field && results.items.length > 0 && (
-        <ul className="mt-2 max-h-48 divide-y divide-navy-100 overflow-y-auto rounded-xl border border-navy-200">
-          {results.items.map((item) => (
-            <li key={`${item.name}-${item.lat}-${item.lng}`}>
+  const renderPoint = (
+    field: Field,
+    label: string,
+    icon: React.ReactNode,
+    value: Origin,
+    accent: 'emerald' | 'rose',
+  ) => {
+    const isSet = query[field].trim() === value.name;
+    const ring =
+      accent === 'emerald'
+        ? 'border-emerald-300 bg-emerald-50/40 focus:border-emerald-500 focus:ring-emerald-500/10'
+        : 'border-rose-300 bg-rose-50/40 focus:border-rose-500 focus:ring-rose-500/10';
+
+    return (
+      <div>
+        <span className="label flex items-center gap-1.5">
+          {icon}
+          {label}
+        </span>
+        <form onSubmit={(e) => runSearch(field, e)} className="flex gap-2">
+          <div className="relative flex-1">
+            <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2">
+              {accent === 'emerald' ? (
+                <Flag size={15} className="text-emerald-600" />
+              ) : (
+                <Target size={15} className="text-rose-600" />
+              )}
+            </span>
+            <input
+              className={`input pl-9 pr-9 font-semibold ${isSet ? ring : ''}`}
+              placeholder={canSearchPlaces ? '예) 진주시청, 진주성' : '예시 경로를 사용해 주세요'}
+              value={query[field]}
+              onChange={(e) => setQuery((q) => ({ ...q, [field]: e.target.value }))}
+            />
+            {query[field] && (
               <button
                 type="button"
-                className="flex w-full flex-col items-start px-3.5 py-2.5 text-left hover:bg-navy-50"
-                onClick={() => {
-                  patch(field === 'origin' ? { origin: item } : { destination: item });
-                  setResults(null);
-                  setQuery((q) => ({ ...q, [field]: '' }));
-                }}
+                onClick={() => setQuery((q) => ({ ...q, [field]: '' }))}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded-full p-1 text-navy-300 hover:bg-navy-100 hover:text-navy-600"
+                aria-label={`${label} 입력 지우기`}
               >
-                <span className="text-[14px] font-semibold text-navy-900">{item.name}</span>
-                <span className="text-[12px] text-navy-400">{item.address}</span>
+                <X size={14} />
               </button>
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
-  );
+            )}
+          </div>
+          <button
+            type="submit"
+            className="btn-secondary shrink-0 px-3"
+            disabled={searching !== null || !canSearchPlaces}
+            aria-label={`${label} 검색`}
+          >
+            {searching === field ? (
+              <Loader2 size={16} className="animate-spin" />
+            ) : (
+              <Search size={16} />
+            )}
+          </button>
+        </form>
+
+        {isSet ? (
+          <p className="mt-1.5 flex items-start gap-1 text-[12px] leading-relaxed text-navy-500">
+            <Check size={13} className={accent === 'emerald' ? 'mt-0.5 shrink-0 text-emerald-600' : 'mt-0.5 shrink-0 text-rose-600'} />
+            <span>
+              <strong className="font-semibold text-navy-700">{label} 설정됨</strong>
+              <span className="text-navy-400"> · {value.address}</span>
+            </span>
+          </p>
+        ) : (
+          <p className="mt-1.5 text-[12px] leading-relaxed text-amber-700">
+            아직 적용되지 않았습니다. 검색 후 목록에서 선택하세요. (현재 {label}:{' '}
+            <strong className="font-semibold">{value.name}</strong>)
+          </p>
+        )}
+        {results?.field === field && results.items.length > 0 && (
+          <ul className="mt-2 max-h-48 divide-y divide-navy-100 overflow-y-auto rounded-xl border border-navy-200">
+            {results.items.map((item) => (
+              <li key={`${item.name}-${item.lat}-${item.lng}`}>
+                <button
+                  type="button"
+                  className="flex w-full flex-col items-start px-3.5 py-2.5 text-left hover:bg-navy-50"
+                  onClick={() => {
+                    patch(field === 'origin' ? { origin: item } : { destination: item });
+                    setResults(null);
+                    setQuery((q) => ({ ...q, [field]: item.name }));
+                  }}
+                >
+                  <span className="text-[14px] font-semibold text-navy-900">{item.name}</span>
+                  <span className="text-[12px] text-navy-400">{item.address}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    );
+  };
 
   return (
     <section className="card p-5 sm:p-6">
@@ -112,7 +186,13 @@ export function RouteSearchPanel({ params, onChange, onSearch, loading, canSearc
       </h3>
 
       <div className="mt-4 space-y-4">
-        {renderPoint('origin', '출발지', <Flag size={12} className="text-emerald-600" />, params.origin)}
+        {renderPoint(
+          'origin',
+          '출발지',
+          <Flag size={12} className="text-emerald-600" />,
+          params.origin,
+          'emerald',
+        )}
 
         <div className="flex justify-center">
           <button
@@ -125,7 +205,13 @@ export function RouteSearchPanel({ params, onChange, onSearch, loading, canSearc
           </button>
         </div>
 
-        {renderPoint('destination', '도착지', <Target size={12} className="text-rose-600" />, params.destination)}
+        {renderPoint(
+          'destination',
+          '도착지',
+          <Target size={12} className="text-rose-600" />,
+          params.destination,
+          'rose',
+        )}
       </div>
 
       {error && <p className="mt-3 text-[12.5px] text-rose-600">{error}</p>}
