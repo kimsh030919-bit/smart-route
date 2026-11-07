@@ -1,15 +1,21 @@
 import { useEffect, useMemo, useState } from 'react';
-import { AlertCircle, Check, Info, Loader2, Plus, Search } from 'lucide-react';
+import { AlertCircle, Check, Info, Loader2, MapPin, Plus, Search } from 'lucide-react';
 import type { Origin, PlaceSearchResult } from '../types';
 import { CATEGORY_META } from '../data/categories';
 import {
   availableSearchSources,
   searchPlaces,
+  sortByDistance,
   sourceLabel,
   type SearchSource,
 } from '../lib/placeSearch';
 import { searchDemoPlaces } from '../data/demoPlaces';
 import { hoursSummary } from '../lib/businessHours';
+
+/** 1km 미만은 m 단위로 */
+function formatDistance(km: number): string {
+  return km < 1 ? `${Math.round(km * 1000)}m` : `${km.toFixed(1)}km`;
+}
 
 interface Props {
   origin: Origin | null;
@@ -29,8 +35,16 @@ export function PlaceSearchPanel({ origin, kakaoReady, addedIds, full, onAdd }: 
   useEffect(() => {
     if (!sources.includes(preferred)) setPreferred(sources[0]);
   }, [sources, preferred]);
+
+  // 출발지가 바뀌면 다시 검색하지 않고도 현재 목록을 가까운 순으로 재정렬
+  useEffect(() => {
+    if (!origin) return;
+    setResults((prev) => sortByDistance(prev, origin));
+  }, [origin]);
   const [keyword, setKeyword] = useState('');
-  const [results, setResults] = useState<PlaceSearchResult[]>(() => searchDemoPlaces(''));
+  const [results, setResults] = useState<PlaceSearchResult[]>(() =>
+    sortByDistance(searchDemoPlaces(''), origin),
+  );
   const [source, setSource] = useState<SearchSource>('demo');
   const [notice, setNotice] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -43,7 +57,7 @@ export function PlaceSearchPanel({ origin, kakaoReady, addedIds, full, onAdd }: 
     const use = overrideSource ?? preferred;
     const q = keyword.trim();
     if (!q) {
-      setResults(searchDemoPlaces(''));
+      setResults(sortByDistance(searchDemoPlaces(''), origin));
       setSource('demo');
       setNotice(null);
       setError(null);
@@ -66,7 +80,7 @@ export function PlaceSearchPanel({ origin, kakaoReady, addedIds, full, onAdd }: 
     } catch (err) {
       setError(err instanceof Error ? err.message : '검색 중 오류가 발생했습니다.');
       // 실패 시 데모 데이터로 폴백 (시연이 끊기지 않도록)
-      setResults(searchDemoPlaces(q));
+      setResults(sortByDistance(searchDemoPlaces(q), origin));
       setSource('demo');
     } finally {
       setLoading(false);
@@ -80,13 +94,23 @@ export function PlaceSearchPanel({ origin, kakaoReady, addedIds, full, onAdd }: 
           <Search size={17} className="text-brand-600" />
           방문 장소 검색
         </h3>
-        <span
-          className={`chip ${
-            source === 'demo' ? 'bg-amber-50 text-amber-700' : 'bg-emerald-50 text-emerald-700'
-          }`}
-        >
-          {sourceLabel(source)} 결과
-        </span>
+        <div className="flex flex-wrap items-center gap-1.5">
+          {origin ? (
+            <span className="chip bg-brand-50 text-brand-700">
+              <MapPin size={11} />
+              {origin.name} 가까운 순
+            </span>
+          ) : (
+            <span className="chip bg-navy-100 text-navy-600">출발지 미설정 · 관련도순</span>
+          )}
+          <span
+            className={`chip ${
+              source === 'demo' ? 'bg-amber-50 text-amber-700' : 'bg-emerald-50 text-emerald-700'
+            }`}
+          >
+            {sourceLabel(source)} 결과
+          </span>
+        </div>
       </div>
 
       {sources.length > 1 && (
@@ -179,8 +203,15 @@ export function PlaceSearchPanel({ origin, kakaoReady, addedIds, full, onAdd }: 
                   )}
                 </p>
                 <p className="mt-0.5 truncate text-[12px] text-navy-400">{r.address}</p>
-                <p className="mt-1 text-[12px] text-navy-500">
-                  영업 {hoursSummary(r.business)} · 기본 체류 {r.defaultStayMinutes}분
+                <p className="mt-1 flex flex-wrap items-center gap-x-2 text-[12px] text-navy-500">
+                  {r.distanceKm !== undefined && (
+                    <span className="font-semibold text-brand-700">
+                      출발지에서 {formatDistance(r.distanceKm)}
+                    </span>
+                  )}
+                  <span>
+                    영업 {hoursSummary(r.business)} · 기본 체류 {r.defaultStayMinutes}분
+                  </span>
                 </p>
               </div>
               <button

@@ -67,6 +67,8 @@ export interface PlaceSearchResult {
   defaultStayMinutes: number;
   business: BusinessInfo;
   isDemo?: boolean;
+  /** 출발지로부터의 직선거리(km). 출발지가 설정된 경우에만 채워진다. */
+  distanceKm?: number;
 }
 
 export interface Origin {

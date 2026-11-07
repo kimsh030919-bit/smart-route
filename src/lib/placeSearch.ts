@@ -2,6 +2,7 @@ import { CATEGORY_META, categoryFromKakao } from '../data/categories';
 import { searchDemoPlaces } from '../data/demoPlaces';
 import type { Origin, PlaceSearchResult } from '../types';
 import { hasVworldKey, searchVworldOrigins, searchVworldPlaces } from './vworld';
+import { haversineKm } from './travel';
 
 export type SearchSource = 'kakao' | 'vworld' | 'demo';
 
@@ -20,6 +21,36 @@ const SOURCE_LABELS: Record<SearchSource, string> = {
 
 export function sourceLabel(s: SearchSource): string {
   return SOURCE_LABELS[s];
+}
+
+/**
+ * 출발지에서 가까운 순으로 정렬하고 거리(km)를 채운다.
+ * 출발지가 없으면 원래 순서(관련도순)를 유지한다.
+ */
+export function sortByDistance(
+  results: PlaceSearchResult[],
+  origin?: Origin | null,
+): PlaceSearchResult[] {
+  if (!origin) return results;
+  return results
+    .map((r) => ({ ...r, distanceKm: haversineKm({ lat: origin.lat, lng: origin.lng }, r) }))
+    .sort((a, b) => a.distanceKm - b.distanceKm);
+}
+
+/**
+ * 브이월드 검색: 출발지가 있으면 가까운 영역(bbox)부터 넓혀 가며 찾는다.
+ *  8km → 25km → 전국, 그래도 없으면 주소(type=address)로 재시도
+ */
+async function searchVworldNearby(
+  keyword: string,
+  origin?: Origin | null,
+): Promise<PlaceSearchResult[]> {
+  const radii: (number | undefined)[] = origin ? [8, 25, undefined] : [undefined];
+  for (const radiusKm of radii) {
+    const found = await searchVworldPlaces(keyword, { type: 'place', origin, radiusKm });
+    if (found.length > 0) return found;
+  }
+  return searchVworldPlaces(keyword, { type: 'address', origin });
 }
 
 /** 현재 사용할 수 있는 검색 소스 목록 (우선순위 순) */
@@ -49,16 +80,18 @@ export async function searchPlaces(
     preferred !== 'auto' && available.includes(preferred) ? preferred : available[0];
 
   if (source === 'demo') {
-    return { source: 'demo', results: searchDemoPlaces(keyword), notice: null };
+    return {
+      source: 'demo',
+      results: sortByDistance(searchDemoPlaces(keyword), origin),
+      notice: null,
+    };
   }
 
   if (source === 'vworld') {
-    const results = await searchVworldPlaces(keyword, { type: 'place' });
-    const fallback = results.length === 0 ? await searchVworldPlaces(keyword, { type: 'address' }) : [];
-    const merged = results.length > 0 ? results : fallback;
+    const merged = await searchVworldNearby(keyword, origin);
     return {
       source: 'vworld',
-      results: merged,
+      results: sortByDistance(merged, origin),
       notice:
         merged.length > 0
           ? '브이월드(공간정보 오픈플랫폼) 검색 결과입니다. 브이월드는 영업시간·휴무·브레이크타임을 제공하지 않아 "정보 확인 필요"로 추가되며, 직접 입력하면 동선 계산에 반영됩니다.'
@@ -110,7 +143,7 @@ export async function searchPlaces(
 
   return {
     source: 'kakao',
-    results,
+    results: sortByDistance(results, origin),
     notice:
       results.length > 0
         ? '카카오맵 검색 결과입니다. 영업시간·휴무·브레이크타임은 제공되지 않아 "정보 확인 필요"로 추가되며, 직접 입력하면 동선 계산에 반영됩니다.'

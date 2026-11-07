@@ -186,8 +186,26 @@ export interface VworldSearchOptions {
   /** place: 지명/POI, address: 주소, district: 행정구역 */
   type?: 'place' | 'address' | 'district';
   size?: number;
-  /** 검색 중심(선택) */
+  /** 검색 중심(선택). 지정하면 bbox로 주변 영역을 우선 검색한다. */
   origin?: Origin | null;
+  /** bbox 반경(km) */
+  radiusKm?: number;
+}
+
+/**
+ * 출발지 중심의 bbox 문자열 "minLng,minLat,maxLng,maxLat"
+ * (브이월드 검색 API는 EPSG:4326 기준 경도,위도 순서를 쓴다)
+ */
+function bboxAround(origin: Origin, radiusKm: number): string {
+  const dLat = radiusKm / 111;
+  const dLng = radiusKm / (111 * Math.max(0.2, Math.cos((origin.lat * Math.PI) / 180)));
+  const f = (n: number) => n.toFixed(6);
+  return [
+    f(origin.lng - dLng),
+    f(origin.lat - dLat),
+    f(origin.lng + dLng),
+    f(origin.lat + dLat),
+  ].join(',');
 }
 
 /**
@@ -196,7 +214,7 @@ export interface VworldSearchOptions {
  */
 export async function searchVworldPlaces(
   query: string,
-  { type = 'place', size = 15 }: VworldSearchOptions = {},
+  { type = 'place', size = 20, origin = null, radiusKm }: VworldSearchOptions = {},
 ): Promise<PlaceSearchResult[]> {
   const params: Record<string, string> = {
     service: 'search',
@@ -211,6 +229,7 @@ export async function searchVworldPlaces(
     errorformat: 'json',
   };
   if (type === 'address') params.category = 'road';
+  if (origin && radiusKm) params.bbox = bboxAround(origin, radiusKm);
 
   const json = await getJson<VworldSearchResponse>('/req/search', params);
   const status = json.response?.status;
