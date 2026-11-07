@@ -1,0 +1,35 @@
+{
+  "name": "smart-route",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "build:relative": "tsc -b && vite build --mode relative",
+    "build:github": "tsc -b && vite build --mode github",
+    "lint": "oxlint",
+    "preview": "vite preview",
+    "serve:dist": "vite preview --port 4173",
+    "package:win": "powershell -NoProfile -Command \"Compress-Archive -Path dist/* -DestinationPath smart-route-dist.zip -Force\"",
+    "verify:demo": "npx --yes tsx scripts/verify-demo.ts"
+  },
+  "dependencies": {
+    "lucide-react": "^1.70.0",
+    "ol": "^10.11.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^24.19.2",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.2",
+    "autoprefixer": "^10.6.2",
+    "oxlint": "^1.90.0",
+    "postcss": "^8.5.32",
+    "tailwindcss": "^3.4.17",
+    "typescript": "~7.0.2",
+    "vite": "^8.3.6"
+  }
+}

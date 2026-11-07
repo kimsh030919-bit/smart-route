@@ -1,0 +1,65 @@
+name: Deploy to GitHub Pages
+
+# GitHub Pages 배포 (정적 호스팅)
+#  - 브이월드 지도 타일 / 카카오맵 / 데모 모드: 정상 동작
+#  - 브이월드 검색·지오코더(JSON API): 서버리스 함수를 쓸 수 없어 동작하지 않음
+#    → 검색까지 필요하면 Vercel / Netlify / Cloudflare Pages 를 사용하세요.
+#
+# 사전 설정
+#  1) 저장소 Settings → Pages → Source: "GitHub Actions"
+#  2) 저장소 Settings → Secrets and variables → Actions → Variables 에 추가(선택)
+#       VITE_KAKAO_MAP_KEY   카카오 JavaScript 키
+#       VITE_VWORLD_API_KEY  브이월드 인증키 (타일용)
+#     ※ 두 키 모두 활용 URL/사이트 도메인에 https://<계정>.github.io 를 등록해야 합니다.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Build
+        env:
+          # 저장소 이름이 곧 Pages 하위 경로가 된다
+          VITE_BASE: /${{ github.event.repository.name }}/
+          VITE_KAKAO_MAP_KEY: ${{ vars.VITE_KAKAO_MAP_KEY }}
+          VITE_VWORLD_API_KEY: ${{ vars.VITE_VWORLD_API_KEY }}
+        run: npm run build
+
+      - name: SPA fallback (404.html)
+        run: cp dist/index.html dist/404.html
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
