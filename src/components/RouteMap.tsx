@@ -149,9 +149,9 @@ export function RouteMap({
           />
         )}
 
-        {/* 선택한 장소 상세정보 */}
+        {/* 선택한 장소 상세정보 — 배경은 반드시 불투명하게(지도 위에서 글씨가 읽혀야 함) */}
         {selected && (
-          <div className="absolute bottom-3 left-3 right-3 rounded-2xl border border-navy-100 bg-white/97 p-4 shadow-pop sm:right-auto sm:w-[22rem]">
+          <div className="absolute bottom-3 left-3 right-3 rounded-2xl border border-navy-200 bg-white p-4 shadow-pop ring-1 ring-navy-900/5 sm:right-auto sm:w-[22rem]">
             <div className="flex items-start justify-between gap-2">
               <div>
                 <p className="flex items-center gap-1.5 text-[14.5px] font-bold text-navy-900">

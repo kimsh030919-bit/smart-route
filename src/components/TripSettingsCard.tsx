@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Calendar, Clock, MapPin, Navigation, Search } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Calendar, Check, Clock, Flag, MapPin, Navigation, Search, X } from 'lucide-react';
 import type { Origin, TransportMode, TripSettings } from '../types';
 import { MODE_LIST } from '../lib/travel';
 import { DEMO_ORIGINS } from '../data/demoPlaces';
@@ -20,6 +20,14 @@ export function TripSettingsCard({ settings, onChange, kakaoReady }: Props) {
 
   const patch = (p: Partial<TripSettings>) => onChange({ ...settings, ...p });
   const searchable = canSearchOrigin(kakaoReady);
+  // 입력칸에 현재 출발지가 그대로 보이는지 (= 적용된 상태인지)
+  const isOriginSet = !!settings.origin && query.trim() === settings.origin.name;
+
+  // 데모 출발지 선택·복원 등으로 출발지가 바뀌면 입력칸도 따라 바뀐다
+  useEffect(() => {
+    const name = settings.origin?.name ?? '';
+    setQuery((q) => (q === name ? q : name));
+  }, [settings.origin]);
 
   async function handleOriginSearch(e: React.FormEvent) {
     e.preventDefault();
@@ -56,13 +64,33 @@ export function TripSettingsCard({ settings, onChange, kakaoReady }: Props) {
           출발 지역
         </label>
         <form onSubmit={handleOriginSearch} className="flex gap-2">
-          <input
-            id="origin-query"
-            className="input"
-            placeholder={searchable ? '예) 성수역, 홍대입구역, 강남역' : '데모 모드에서는 아래 목록에서 선택'}
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-          />
+          <div className="relative flex-1">
+            <Flag
+              size={15}
+              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-emerald-600"
+            />
+            <input
+              id="origin-query"
+              className={`input pl-9 pr-9 font-semibold ${
+                isOriginSet
+                  ? 'border-emerald-300 bg-emerald-50/40 focus:border-emerald-500 focus:ring-emerald-500/10'
+                  : ''
+              }`}
+              placeholder={searchable ? '예) 성수역, 홍대입구역, 강남역' : '데모 모드에서는 아래 목록에서 선택'}
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+            />
+            {query && (
+              <button
+                type="button"
+                onClick={() => setQuery('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded-full p-1 text-navy-300 hover:bg-navy-100 hover:text-navy-600"
+                aria-label="출발지 입력 지우기"
+              >
+                <X size={14} />
+              </button>
+            )}
+          </div>
           <button
             type="submit"
             className="btn-secondary shrink-0 px-3"
@@ -72,6 +100,22 @@ export function TripSettingsCard({ settings, onChange, kakaoReady }: Props) {
             <Search size={16} />
           </button>
         </form>
+
+        {settings.origin &&
+          (isOriginSet ? (
+            <p className="mt-1.5 flex items-start gap-1 text-[12px] leading-relaxed text-navy-500">
+              <Check size={13} className="mt-0.5 shrink-0 text-emerald-600" />
+              <span>
+                <strong className="font-semibold text-navy-700">출발지 설정됨</strong>
+                <span className="text-navy-400"> · {settings.origin.address}</span>
+              </span>
+            </p>
+          ) : (
+            <p className="mt-1.5 text-[12px] leading-relaxed text-amber-700">
+              아직 적용되지 않았습니다. 검색 후 목록에서 선택하세요. (현재 출발지:{' '}
+              <strong className="font-semibold">{settings.origin.name}</strong>)
+            </p>
+          ))}
 
         <div className="mt-2 flex flex-wrap gap-1.5">
           {DEMO_ORIGINS.map((o) => (
@@ -101,7 +145,7 @@ export function TripSettingsCard({ settings, onChange, kakaoReady }: Props) {
                   onClick={() => {
                     patch({ origin: c });
                     setCandidates(null);
-                    setQuery('');
+                    setQuery(c.name);
                   }}
                 >
                   <span className="text-[14px] font-semibold text-navy-900">{c.name}</span>
@@ -114,13 +158,6 @@ export function TripSettingsCard({ settings, onChange, kakaoReady }: Props) {
 
         {error && <p className="mt-2 text-[12.5px] text-rose-600">{error}</p>}
 
-        {settings.origin && (
-          <p className="mt-2 flex items-center gap-1.5 text-[12.5px] text-navy-500">
-            <MapPin size={13} className="text-brand-600" />
-            출발지: <strong className="font-semibold text-navy-800">{settings.origin.name}</strong>
-            <span className="text-navy-400">· {settings.origin.address}</span>
-          </p>
-        )}
       </div>
 
       {/* 날짜 / 시간 */}
