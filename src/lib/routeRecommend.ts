@@ -49,7 +49,7 @@ export async function searchAlongRoute(params: RouteSearchParams): Promise<Route
       scannedCount: filtered.length,
       notes: [
         ...notes,
-        `경로 반경 ${radiusKm}km 안에 등록된 가게가 없습니다. 반경을 넓히거나 관리자 페이지에서 가게를 등록해 주세요.`,
+        `경로 반경 ${radiusKm}km 안에 등록된 장소가 없습니다. 반경을 넓히거나 관리자 페이지에서 장소를 등록해 주세요.`,
       ],
     };
   }

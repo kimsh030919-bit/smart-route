@@ -14,7 +14,7 @@ interface Props {
 const NAV: { key: View; label: string }[] = [
   { key: 'route', label: '경로 주변 추천' },
   { key: 'planner', label: '하루 일정 플래너' },
-  { key: 'admin', label: '가게 정보 관리' },
+  { key: 'admin', label: '장소 정보 관리' },
 ];
 
 const STATUS_TEXT: Record<KakaoStatus, { label: string; cls: string }> = {

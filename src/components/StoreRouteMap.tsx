@@ -12,8 +12,12 @@ import { Stroke, Style } from 'ol/style';
 import { fromLonLat } from 'ol/proj';
 import 'ol/ol.css';
 
+import { X } from 'lucide-react';
 import type { Origin, RouteCandidate, RouteLeg } from '../types';
 import { STATUS_META } from '../lib/storeStatus';
+import { CATEGORY_META } from '../data/categories';
+import { breaksSummary, closedDaysSummary, hoursSummary } from '../lib/businessHours';
+import { formatClock, formatDuration } from '../lib/time';
 import { tileUrlTemplate, hasVworldKey, type VworldLayer } from '../lib/vworld';
 
 interface Props {
@@ -70,6 +74,10 @@ export function StoreRouteMap({
   const tileRef = useRef<TileLayer<XYZ> | null>(null);
   const routeSourceRef = useRef<VectorSource | null>(null);
   const overlaysRef = useRef<Overlay[]>([]);
+  const popupRef = useRef<HTMLDivElement>(null);
+  const popupOverlayRef = useRef<Overlay | null>(null);
+
+  const selected = candidates.find((c) => c.store.id === selectedId) ?? null;
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
@@ -99,6 +107,20 @@ export function StoreRouteMap({
     });
     tileRef.current = tile;
     routeSourceRef.current = routeSource;
+
+    // 말풍선 팝업 (선택한 장소 위에 표시)
+    if (popupRef.current) {
+      popupOverlayRef.current = new Overlay({
+        element: popupRef.current,
+        positioning: 'bottom-center',
+        offset: [0, -34],
+        stopEvent: true,
+        // 말풍선이 지도 밖으로 잘리면 지도를 밀어서 전체가 보이게 한다
+        autoPan: { animation: { duration: 250 }, margin: 24 },
+      });
+      mapRef.current.addOverlay(popupOverlayRef.current);
+    }
+
     return () => {
       mapRef.current?.setTarget(undefined);
       mapRef.current = null;
@@ -153,6 +175,19 @@ export function StoreRouteMap({
     });
   }, [route, origin, destination, candidates, selectedId, onSelect]);
 
+  // 선택된 장소 위로 말풍선 이동 / 숨김
+  useEffect(() => {
+    const ov = popupOverlayRef.current;
+    if (!ov) return;
+    if (selected) {
+      // 위치를 먼저 비워야 autoPan이 새 위치 기준으로 다시 계산된다
+      ov.setPosition(undefined);
+      ov.setPosition(fromLonLat([selected.store.lng, selected.store.lat]));
+    } else {
+      ov.setPosition(undefined);
+    }
+  }, [selected]);
+
   if (!hasVworldKey()) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-2 px-6 text-center text-[13px] text-navy-500">
@@ -165,5 +200,110 @@ export function StoreRouteMap({
     );
   }
 
-  return <div ref={containerRef} className="h-full w-full" />;
+  return (
+    <div className="relative h-full w-full">
+      <div ref={containerRef} className="h-full w-full" />
+
+      {/* 말풍선 팝업 — OpenLayers Overlay가 위치를 잡고, 내용은 React가 그린다 */}
+      <div ref={popupRef} className={selected ? 'block' : 'hidden'}>
+        {selected && <StorePopup c={selected} onClose={() => onSelect(null)} />}
+      </div>
+    </div>
+  );
+}
+
+/** 지도 마커 클릭 시 뜨는 말풍선 */
+function StorePopup({ c, onClose }: { c: RouteCandidate; onClose: () => void }) {
+  const meta = CATEGORY_META[c.store.category];
+  const status = STATUS_META[c.evaluation.status];
+  const Icon = meta.icon;
+  const dist = c.travelKm < 1 ? `${Math.round(c.travelKm * 1000)}m` : `${c.travelKm.toFixed(1)}km`;
+
+  return (
+    <div className="relative w-[278px] -translate-x-1/2">
+      <div className="rounded-2xl border border-navy-200 bg-white p-3.5 shadow-pop">
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            <p className="flex flex-wrap items-center gap-1.5 text-[14px] font-extrabold text-navy-900">
+              {c.order && (
+                <span
+                  className="flex h-5 w-5 items-center justify-center rounded-md text-[11px] font-bold text-white"
+                  style={{ background: status.marker }}
+                >
+                  {c.order}
+                </span>
+              )}
+              <span className={`flex h-5 w-5 items-center justify-center rounded-md ${meta.bg}`}>
+                <Icon size={11} />
+              </span>
+              {c.store.name}
+            </p>
+            <p className="mt-1 flex flex-wrap items-center gap-1">
+              <span className={`chip ${meta.bg}`}>{meta.label}</span>
+              <span className={`chip ${status.chip}`}>{status.label}</span>
+              {c.store.dataKind === 'demo' && (
+                <span className="chip bg-navy-100 text-navy-600">데모</span>
+              )}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="btn-ghost shrink-0 px-1.5 py-1"
+            aria-label="닫기"
+          >
+            <X size={14} />
+          </button>
+        </div>
+
+        <p className="mt-2 text-[11.5px] leading-relaxed text-navy-400">{c.store.address}</p>
+
+        <dl className="mt-2 space-y-1 text-[12px] text-navy-600">
+          <div className="flex justify-between gap-2">
+            <dt className="text-navy-400">영업시간</dt>
+            <dd className="text-right font-semibold">{hoursSummary(c.store.business)}</dd>
+          </div>
+          <div className="flex justify-between gap-2">
+            <dt className="text-navy-400">휴무일</dt>
+            <dd className="text-right font-semibold">{closedDaysSummary(c.store.business)}</dd>
+          </div>
+          <div className="flex justify-between gap-2">
+            <dt className="text-navy-400">브레이크</dt>
+            <dd className="text-right font-semibold">
+              {c.store.business.breaks.length > 0 ? breaksSummary(c.store.business) : '정보 없음'}
+            </dd>
+          </div>
+          <div className="flex justify-between gap-2">
+            <dt className="text-navy-400">출발지에서</dt>
+            <dd className="tnum text-right font-semibold">
+              {dist} · {formatDuration(c.travelMin)}
+              <span className="ml-1 font-normal text-navy-400">
+                ({c.realRoad ? '실제 도로' : '직선 추정'})
+              </span>
+            </dd>
+          </div>
+          <div className="flex justify-between gap-2">
+            <dt className="text-navy-400">도착 예정</dt>
+            <dd className="tnum text-right font-semibold">{formatClock(c.arrivalMinutes)}</dd>
+          </div>
+          <div className="flex justify-between gap-2">
+            <dt className="text-navy-400">예상 체류</dt>
+            <dd className="text-right font-semibold">{formatDuration(c.store.stayMinutes)}</dd>
+          </div>
+        </dl>
+
+        <p className={`mt-2 rounded-lg px-2.5 py-2 text-[11.5px] leading-relaxed ${status.chip}`}>
+          {c.evaluation.detail}
+        </p>
+
+        <p className="mt-1.5 text-[10.5px] text-navy-400">
+          {c.store.verifiedAt ? `정보 최종 확인 ${c.store.verifiedAt}` : '최종 확인일 미등록'}
+        </p>
+      </div>
+
+      {/* 말풍선 꼬리 */}
+      <div className="absolute left-1/2 top-full h-0 w-0 -translate-x-1/2 border-x-8 border-t-[10px] border-x-transparent border-t-navy-200" />
+      <div className="absolute left-1/2 top-full h-0 w-0 -translate-x-1/2 border-x-[7px] border-t-[9px] border-x-transparent border-t-white" />
+    </div>
+  );
 }

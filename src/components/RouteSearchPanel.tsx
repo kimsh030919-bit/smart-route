@@ -202,7 +202,7 @@ export function RouteSearchPanel({ params, onChange, onSearch, loading, canSearc
 
       {/* 업종 */}
       <div className="mt-5">
-        <span className="label">검색할 가게 종류 {params.categories.length === 0 && '(전체)'}</span>
+        <span className="label">검색할 장소 종류 {params.categories.length === 0 && '(전체)'}</span>
         <div className="flex flex-wrap gap-1.5">
           {CATEGORY_LIST.map((c) => {
             const active = params.categories.includes(c.key);
@@ -242,13 +242,13 @@ export function RouteSearchPanel({ params, onChange, onSearch, loading, canSearc
           className="w-full accent-brand-600"
         />
         <p className="mt-1 text-[11.5px] text-navy-400">
-          경로 중심선에서 이 거리 안에 있는 가게만 추천합니다. (최대 {params.limit}곳)
+          경로 중심선에서 이 거리 안에 있는 장소만 추천합니다. (최대 {params.limit}곳)
         </p>
       </div>
 
       <button type="button" onClick={onSearch} disabled={loading} className="btn-primary mt-5 w-full py-3.5 text-[16px]">
         {loading ? <Loader2 size={18} className="animate-spin" /> : <Search size={18} />}
-        {loading ? '경로 주변 가게 찾는 중…' : '경로 주변 가게 검색'}
+        {loading ? '경로 주변 장소 찾는 중…' : '경로 주변 장소 검색'}
       </button>
     </section>
   );

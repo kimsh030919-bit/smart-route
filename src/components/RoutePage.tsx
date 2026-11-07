@@ -53,7 +53,7 @@ export function RoutePage({ canSearchPlaces }: Props) {
       setResult(res);
       setSelectedId(null);
       if (res.visitable.length === 0 && res.unvisitable.length === 0) {
-        setError('경로 주변에서 등록된 가게를 찾지 못했습니다. 검색 범위를 넓혀 보세요.');
+        setError('경로 주변에서 등록된 장소를 찾지 못했습니다. 검색 범위를 넓혀 보세요.');
       }
     } catch (e) {
       setResult(null);
@@ -74,7 +74,7 @@ export function RoutePage({ canSearchPlaces }: Props) {
     try {
       const p = await buildOptimizedPlan(result);
       if (!p) {
-        setError('최적 일정을 만들려면 방문 가능한 가게가 2곳 이상 필요합니다.');
+        setError('최적 일정을 만들려면 방문 가능한 장소가 2곳 이상 필요합니다.');
         return;
       }
       setPlan(p);
@@ -92,10 +92,10 @@ export function RoutePage({ canSearchPlaces }: Props) {
     <section className="bg-white">
       <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6">
         <h2 className="text-[26px] font-extrabold tracking-tight text-navy-900 sm:text-[30px]">
-          경로 주변 가게 추천
+          경로 주변 장소 추천
         </h2>
         <p className="mt-2.5 text-[15px] leading-relaxed text-navy-500">
-          출발지와 도착지를 입력하면 이동 경로 주변에 있는 가게를 찾아, 출발지에서 가까운 순으로
+          출발지와 도착지를 입력하면 이동 경로 주변에 있는 장소를 찾아, 출발지에서 가까운 순으로
           보여 줍니다. 영업시간 · 정기 휴무 · 임시 휴무 · 브레이크 타임을 확인해 방문 가능한 곳과
           그렇지 않은 곳을 구분합니다.
         </p>

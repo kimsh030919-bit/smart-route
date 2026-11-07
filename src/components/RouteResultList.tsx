@@ -163,7 +163,7 @@ export function RouteResultList({ result, selectedId, onSelect }: Props) {
             </li>
           ))}
           <li className="text-[11.5px] text-navy-400">
-            DB에서 {result.scannedCount}곳을 검사해 경로 반경 {params.radiusKm}km 안의 가게를 추렸습니다.
+            DB에서 {result.scannedCount}곳을 검사해 경로 반경 {params.radiusKm}km 안의 장소를 추렸습니다.
           </li>
         </ul>
       </section>
@@ -171,11 +171,11 @@ export function RouteResultList({ result, selectedId, onSelect }: Props) {
       <section className="card p-5">
         <h3 className="flex items-center gap-2 text-[16px] font-bold text-navy-900">
           <Flag size={17} className="text-emerald-600" />
-          방문 가능한 가게 · 출발지에서 가까운 순
+          방문 가능한 장소 · 출발지에서 가까운 순
         </h3>
         {visitable.length === 0 ? (
           <p className="mt-3 rounded-xl border border-dashed border-navy-200 bg-navy-50/60 px-4 py-6 text-center text-[13.5px] text-navy-500">
-            이 시각에 방문할 수 있는 가게가 없습니다. 출발 시간이나 검색 범위를 바꿔 보세요.
+            이 시각에 방문할 수 있는 장소가 없습니다. 출발 시간이나 검색 범위를 바꿔 보세요.
           </p>
         ) : (
           <ol className="mt-3 space-y-2.5">
@@ -199,7 +199,7 @@ export function RouteResultList({ result, selectedId, onSelect }: Props) {
         <section className="card border-rose-200 p-5">
           <h3 className="flex items-center gap-2 text-[16px] font-bold text-rose-700">
             <XCircle size={17} />
-            지금은 방문할 수 없는 가게 {unvisitable.length}곳
+            지금은 방문할 수 없는 장소 {unvisitable.length}곳
           </h3>
           <p className="mt-1.5 text-[12.5px] text-navy-500">
             경로 주변에 있지만 휴무·브레이크 타임·영업 종료로 방문이 어려운 곳입니다.

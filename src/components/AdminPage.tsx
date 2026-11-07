@@ -31,7 +31,7 @@ import { searchPlaces } from '../lib/placeSearch';
 
 const SAMPLE_JSON = `[
   {
-    "name": "가게 이름",
+    "name": "장소 이름",
     "category": "cafe",
     "address": "경상남도 진주시 ...",
     "lat": 35.1803,
@@ -84,7 +84,7 @@ export function AdminPage() {
     <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6">
       <h2 className="flex items-center gap-2 text-[26px] font-extrabold tracking-tight text-navy-900 sm:text-[30px]">
         <Database size={24} className="text-brand-600" />
-        가게 정보 관리
+        장소 정보 관리
       </h2>
       <p className="mt-2.5 text-[15px] leading-relaxed text-navy-500">
         여기에 등록한 영업시간·휴무일·브레이크 타임이 사용자 경로 추천에 <strong>즉시</strong> 반영됩니다.
@@ -95,9 +95,9 @@ export function AdminPage() {
       {/* 통계 */}
       <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
         {[
-          { label: '등록 가게', value: `${stats.total}곳`, sub: '전체' },
+          { label: '등록 장소', value: `${stats.total}곳`, sub: '전체' },
           { label: '실제 확인', value: `${stats.real}곳`, sub: '출처 보유' },
-          { label: '데모 데이터', value: `${stats.demo}곳`, sub: '가상 가게' },
+          { label: '데모 데이터', value: `${stats.demo}곳`, sub: '가상 장소' },
           { label: '영업시간 확보', value: `${stats.withHours}곳`, sub: '시간 제약 적용' },
           { label: '브레이크 등록', value: `${stats.withBreaks}곳`, sub: '휴게시간 보유' },
           { label: '정보 미확인', value: `${stats.unverified}곳`, sub: '확인 필요' },
@@ -116,14 +116,14 @@ export function AdminPage() {
           <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-navy-300" />
           <input
             className="input pl-9"
-            placeholder="가게 이름 · 주소 검색"
+            placeholder="장소 이름 · 주소 검색"
             value={keyword}
             onChange={(e) => setKeyword(e.target.value)}
           />
         </div>
         <button type="button" className="btn-primary px-4 py-2.5" onClick={() => setEditing(emptyStore())}>
           <Plus size={16} />
-          가게 신규 등록
+          장소 신규 등록
         </button>
         <button type="button" className="btn-secondary" onClick={() => setBulkOpen((v) => !v)}>
           <Upload size={15} />
@@ -137,7 +137,7 @@ export function AdminPage() {
           type="button"
           className="btn-secondary"
           onClick={() => {
-            if (confirm('등록한 가게 정보를 모두 지우고 기본 시드 데이터로 되돌릴까요?')) {
+            if (confirm('등록한 장소 정보를 모두 지우고 기본 시드 데이터로 되돌릴까요?')) {
               setStores(resetToSeed());
               setMessage('시드 데이터로 초기화했습니다.');
             }
@@ -204,7 +204,7 @@ export function AdminPage() {
         <table className="w-full min-w-[840px] border-collapse text-left">
           <thead>
             <tr className="border-b border-navy-200 text-[12px] font-semibold text-navy-500">
-              <th className="px-3 py-2.5">가게</th>
+              <th className="px-3 py-2.5">장소</th>
               <th className="px-3 py-2.5">업종</th>
               <th className="px-3 py-2.5">영업시간</th>
               <th className="px-3 py-2.5">휴무</th>
@@ -342,7 +342,7 @@ function StoreEditor({
       <div className="card my-8 w-full max-w-2xl p-6">
         <div className="flex items-center justify-between">
           <h3 className="text-[18px] font-extrabold text-navy-900">
-            {store.name ? '가게 정보 수정' : '가게 신규 등록'}
+            {store.name ? '장소 정보 수정' : '장소 신규 등록'}
           </h3>
           <button type="button" className="btn-ghost px-2 py-1" onClick={onClose} aria-label="닫기">
             <X size={18} />
@@ -352,7 +352,7 @@ function StoreEditor({
         <div className="mt-5 grid gap-4 sm:grid-cols-2">
           <div className="sm:col-span-2">
             <label className="label" htmlFor="st-name">
-              가게 이름
+              장소 이름
             </label>
             <input
               id="st-name"
