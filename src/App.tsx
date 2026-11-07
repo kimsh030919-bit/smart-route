@@ -14,6 +14,9 @@ import {
 import { Header } from './components/Header';
 import { Hero } from './components/Hero';
 import { Features } from './components/Features';
+import { RoutePage } from './components/RoutePage';
+import { AdminPage } from './components/AdminPage';
+import { hasVworldKey } from './lib/vworld';
 import { TripSettingsCard } from './components/TripSettingsCard';
 import { PlaceSearchPanel } from './components/PlaceSearchPanel';
 import { PlaceCard } from './components/PlaceCard';
@@ -56,9 +59,31 @@ function toPlace(r: PlaceSearchResult): Place {
   };
 }
 
+export type View = 'route' | 'planner' | 'admin';
+
+function viewFromHash(): View {
+  const h = window.location.hash.replace(/^#\/?/, '');
+  if (h === 'planner' || h === 'admin') return h;
+  return 'route';
+}
+
 export default function App() {
   const { status: kakaoStatus, error: kakaoError } = useKakaoLoader();
   const kakaoReady = kakaoStatus === 'ready';
+
+  const [view, setView] = useState<View>(() => viewFromHash());
+
+  useEffect(() => {
+    const onHash = () => setView(viewFromHash());
+    window.addEventListener('hashchange', onHash);
+    return () => window.removeEventListener('hashchange', onHash);
+  }, []);
+
+  const navigate = useCallback((next: View) => {
+    window.location.hash = next === 'route' ? '/' : `/${next}`;
+    setView(next);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, []);
 
   const persisted = useMemo(() => loadState(), []);
   const [places, setPlaces] = useState<Place[]>(persisted?.places ?? []);
@@ -185,10 +210,31 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-white">
-      <Header kakaoStatus={kakaoStatus} onStart={() => scrollTo(plannerRef)} />
+      <Header
+        kakaoStatus={kakaoStatus}
+        view={view}
+        onNavigate={navigate}
+        onStart={() => (view === 'planner' ? scrollTo(plannerRef) : navigate('planner'))}
+      />
       <main>
-        <Hero onStart={() => scrollTo(plannerRef)} onDemo={quickDemo} />
-        <Features />
+        {view === 'route' && (
+          <>
+            <Hero
+              onStart={() => navigate('planner')}
+              onDemo={() => {
+                quickDemo();
+                navigate('planner');
+              }}
+            />
+            <RoutePage canSearchPlaces={kakaoReady || hasVworldKey()} />
+          </>
+        )}
+
+        {view === 'admin' && <AdminPage />}
+
+        {view === 'planner' && (
+          <>
+            <Features />
 
         <section ref={plannerRef} id="planner" className="scroll-mt-20 bg-white">
           <div className="mx-auto max-w-6xl px-4 py-14 sm:px-6">
@@ -418,6 +464,8 @@ export default function App() {
             )}
           </div>
         </section>
+          </>
+        )}
       </main>
       <Footer />
     </div>

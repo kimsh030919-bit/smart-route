@@ -206,6 +206,13 @@ function solve(
   return { best, fails };
 }
 
+/** 행렬에서 지정한 인덱스들만 남긴 부분 행렬 */
+function sliceMatrix(matrix: TravelMatrix, keep: number[]): TravelMatrix {
+  const minutes = keep.map((i) => keep.map((j) => matrix.minutes[i]?.[j] ?? 0));
+  const km = keep.map((i) => keep.map((j) => matrix.km[i]?.[j] ?? 0));
+  return { minutes, km };
+}
+
 function reconstruct(best: State | null, candidates: Compiled[]): State[] {
   const chain: State[] = [];
   let cur = best;
@@ -296,6 +303,11 @@ export interface OptimizeOptions {
   searchAlternatives?: boolean;
   /** true면 최적화하지 않고 사용자가 입력한 순서를 그대로 검증한다 */
   fixedOrder?: boolean;
+  /**
+   * 외부에서 계산한 이동시간/거리 행렬 (인덱스 0 = 출발지, 1..n = places 순서).
+   * 실제 도로 경로 API 결과를 넣으면 직선거리 추정 대신 그 값을 사용한다.
+   */
+  matrix?: TravelMatrix;
 }
 
 /** 사용자가 지정한 순서를 그대로 따라가며 시간 제약을 검증 */
@@ -407,7 +419,13 @@ export function optimizeSchedule(
     }
   });
 
-  const matrix = buildMatrix(origin, candidatePlaces, mode);
+  // 외부 행렬이 있으면 제외된 장소를 뺀 부분 행렬을 만들어 사용한다.
+  const matrix = options.matrix
+    ? sliceMatrix(
+        options.matrix,
+        [0, ...places.map((_, i) => (compiledAll[i].staticFail ? -1 : i + 1)).filter((i) => i > 0)],
+      )
+    : buildMatrix(origin, candidatePlaces, mode);
   const { best, fails } = options.fixedOrder
     ? followFixedOrder(candidates, matrix, startMinutes, endLimit)
     : solve(candidates, matrix, startMinutes, endLimit);

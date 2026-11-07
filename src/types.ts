@@ -71,6 +71,138 @@ export interface PlaceSearchResult {
   distanceKm?: number;
 }
 
+/* ───────────────────────── 가게 데이터베이스 ───────────────────────── */
+
+/** 임시 휴무 (특정 날짜) */
+export interface TempClosure {
+  /** "YYYY-MM-DD" */
+  date: string;
+  reason?: string;
+}
+
+/**
+ * 데이터 종류
+ *  - real : 실제로 확인한 장소 (출처/확인일 보유)
+ *  - demo : 알고리즘 시연용 가상 가게 (이름에 [데모] 표기)
+ */
+export type StoreDataKind = 'real' | 'demo';
+
+export interface Store {
+  id: string;
+  name: string;
+  category: Category;
+  address: string;
+  lat: number;
+  lng: number;
+  phone?: string;
+  /** 예상 체류시간(분) */
+  stayMinutes: number;
+  /** 영업시간·휴무·브레이크타임 (verified=false면 "정보 없음") */
+  business: BusinessInfo;
+  /** 날짜 지정 임시 휴무 */
+  tempClosures: TempClosure[];
+  /** 정보 최종 확인 날짜 "YYYY-MM-DD" (없으면 미확인) */
+  verifiedAt?: string;
+  /** 영업정보 출처 (URL 또는 기관명) */
+  sourceUrl?: string;
+  dataKind: StoreDataKind;
+  /** 레코드 수정 시각 ISO */
+  updatedAt: string;
+  memo?: string;
+}
+
+/** 특정 시각 기준 가게 방문 가능 상태 */
+export type StoreStatus =
+  | 'open' // 영업 중 (방문 가능)
+  | 'break' // 브레이크 타임
+  | 'before_open' // 아직 영업 전 (대기하면 가능)
+  | 'after_close' // 영업 종료
+  | 'after_last_order' // 라스트 오더 경과
+  | 'closed_weekday' // 정기 휴무
+  | 'temp_closed' // 임시 휴무
+  | 'unknown'; // 영업정보 미확인
+
+export interface StoreEvaluation {
+  status: StoreStatus;
+  /** 사용자에게 보여줄 설명 */
+  detail: string;
+  /** 영업 시작까지 기다리면 방문 가능한 경우의 대기 시간(분) */
+  waitMinutes?: number;
+  /** 브레이크 종료 후 방문 가능한 경우의 시작 시각(분) */
+  resumeAt?: number;
+}
+
+export interface RouteGeometryPoint {
+  lng: number;
+  lat: number;
+}
+
+export type RoutingProvider = 'osrm' | 'ors' | 'straight';
+
+export interface RouteLeg {
+  distanceKm: number;
+  durationMin: number;
+  /** 실제 도로 경로 좌표열 */
+  geometry: RouteGeometryPoint[];
+  provider: RoutingProvider;
+  /** 도로망 기반 실제 경로인지 (false면 직선 추정) */
+  realRoad: boolean;
+  /** 소요시간이 라우팅 엔진 실측인지 (false면 속도 기반 추정) */
+  realDuration: boolean;
+  note: string;
+}
+
+/** 경로 주변에서 찾은 가게 1건 */
+export interface RouteCandidate {
+  store: Store;
+  /** 출발지 → 가게 실제 도로 이동거리(km) */
+  travelKm: number;
+  /** 출발지 → 가게 이동시간(분) */
+  travelMin: number;
+  /** 이동거리/시간이 실제 도로 기준인지 */
+  realRoad: boolean;
+  realDuration: boolean;
+  /** 경로 중심선에서 벗어난 직선거리(km) */
+  detourKm: number;
+  /** 경로 시작점에서의 진행 거리(km) — 경로 진행순 정렬용 */
+  alongKm: number;
+  /** 도착 예정 시각(분) */
+  arrivalMinutes: number;
+  evaluation: StoreEvaluation;
+  /** 방문 순번 (방문 가능한 가게만 부여) */
+  order?: number;
+}
+
+export interface RouteSearchParams {
+  origin: Origin;
+  destination: Origin;
+  /** "YYYY-MM-DD" */
+  date: string;
+  /** "HH:MM" */
+  startTime: string;
+  mode: TransportMode;
+  /** 빈 배열이면 전체 */
+  categories: Category[];
+  /** 경로 주변 검색 반경(km) */
+  radiusKm: number;
+  /** 최대 추천 개수 */
+  limit: number;
+}
+
+export interface RouteSearchResult {
+  params: RouteSearchParams;
+  /** 출발지 → 도착지 기본 경로 */
+  baseRoute: RouteLeg;
+  /** 방문 가능한 가게 (거리순) */
+  visitable: RouteCandidate[];
+  /** 방문할 수 없는 가게 + 이유 */
+  unvisitable: RouteCandidate[];
+  /** 검색 대상이 된 전체 가게 수 */
+  scannedCount: number;
+  /** 데이터 출처 안내 */
+  notes: string[];
+}
+
 export interface Origin {
   name: string;
   address: string;

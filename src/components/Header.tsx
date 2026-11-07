@@ -2,10 +2,20 @@ import { Globe2, Route, Sparkles } from 'lucide-react';
 import type { KakaoStatus } from '../hooks/useKakaoLoader';
 import { hasVworldKey } from '../lib/vworld';
 
+type View = 'route' | 'planner' | 'admin';
+
 interface Props {
   kakaoStatus: KakaoStatus;
+  view: View;
+  onNavigate: (v: View) => void;
   onStart: () => void;
 }
+
+const NAV: { key: View; label: string }[] = [
+  { key: 'route', label: '경로 주변 추천' },
+  { key: 'planner', label: '하루 일정 플래너' },
+  { key: 'admin', label: '가게 정보 관리' },
+];
 
 const STATUS_TEXT: Record<KakaoStatus, { label: string; cls: string }> = {
   demo: { label: '데모 모드 (지도 API 키 없음)', cls: 'bg-amber-50 text-amber-700' },
@@ -14,7 +24,7 @@ const STATUS_TEXT: Record<KakaoStatus, { label: string; cls: string }> = {
   error: { label: '지도 연결 실패 · 데모 모드', cls: 'bg-rose-50 text-rose-700' },
 };
 
-export function Header({ kakaoStatus, onStart }: Props) {
+export function Header({ kakaoStatus, view, onNavigate, onStart }: Props) {
   // 카카오 상태는 "연결됨 / 오류"일 때만 노출한다.
   // (브이월드만 쓰는 경우 "카카오맵 키 없음" 배지는 불필요한 노이즈)
   // 지도 키가 하나도 없을 때는 데모 모드임을 반드시 알린다.
@@ -23,8 +33,12 @@ export function Header({ kakaoStatus, onStart }: Props) {
   const status = STATUS_TEXT[kakaoStatus];
   return (
     <header className="sticky top-0 z-40 border-b border-navy-100 bg-white/85 backdrop-blur">
-      <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6">
-        <a href="#top" className="flex items-center gap-2.5">
+      <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-3 px-4 sm:px-6">
+        <button
+          type="button"
+          onClick={() => onNavigate('route')}
+          className="flex shrink-0 items-center gap-2.5"
+        >
           <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-600 text-white">
             <Route size={19} strokeWidth={2.4} />
           </span>
@@ -36,7 +50,22 @@ export function Header({ kakaoStatus, onStart }: Props) {
               AI 스마트 동선 플래너
             </span>
           </span>
-        </a>
+        </button>
+
+        <nav className="hidden items-center gap-1 md:flex">
+          {NAV.map((n) => (
+            <button
+              key={n.key}
+              type="button"
+              onClick={() => onNavigate(n.key)}
+              className={`rounded-lg px-3 py-1.5 text-[13.5px] font-semibold transition-colors ${
+                view === n.key ? 'bg-brand-50 text-brand-700' : 'text-navy-500 hover:bg-navy-50'
+              }`}
+            >
+              {n.label}
+            </button>
+          ))}
+        </nav>
 
         <div className="flex items-center gap-3">
           {hasVworldKey() && (
