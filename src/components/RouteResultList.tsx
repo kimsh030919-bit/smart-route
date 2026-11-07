@@ -5,6 +5,7 @@ import {
   Database,
   Flag,
   MapPin,
+  Repeat2,
   Route,
   Target,
   Timer,
@@ -21,6 +22,8 @@ interface Props {
   result: RouteSearchResult;
   selectedId: string | null;
   onSelect: (id: string) => void;
+  /** 대체 장소로 교체하고 동선을 다시 계산 */
+  onUseAlternative: (altStoreId: string) => void;
 }
 
 function distanceText(km: number): string {
@@ -31,10 +34,14 @@ function CandidateCard({
   c,
   selected,
   onSelect,
+  distanceLabel = '출발지에서',
+  onUseAlternative,
 }: {
   c: RouteCandidate;
   selected: boolean;
   onSelect: () => void;
+  distanceLabel?: string;
+  onUseAlternative?: (altStoreId: string) => void;
 }) {
   const meta = CATEGORY_META[c.store.category];
   const Icon = meta.icon;
@@ -83,7 +90,7 @@ function CandidateCard({
         <div className="mt-2 grid gap-1 text-[12.5px] text-navy-600 sm:grid-cols-2">
           <span className="flex items-center gap-1">
             <Route size={12} className="text-brand-600" />
-            출발지에서 <strong className="font-semibold">{distanceText(c.travelKm)}</strong>
+            {distanceLabel} <strong className="font-semibold">{distanceText(c.travelKm)}</strong>
             <span className="text-navy-400">({c.realRoad ? '실제 도로' : '직선 추정'})</span>
           </span>
           <span className="flex items-center gap-1">
@@ -112,6 +119,43 @@ function CandidateCard({
         >
           {c.evaluation.detail}
         </p>
+
+        {/* 방문 불가 → 같은 업종의 대체 장소 제안 */}
+        {c.alternative && (
+          <div className="mt-2.5 rounded-xl border border-brand-200 bg-brand-50/70 px-3 py-2.5">
+            <p className="flex items-center gap-1.5 text-[12.5px] font-bold text-brand-800">
+              <Repeat2 size={13} />
+              대체 장소 제안
+            </p>
+            <p className="mt-1 text-[12.5px] leading-relaxed text-navy-700">
+              같은 업종의{' '}
+              <strong className="font-bold">{c.alternative.candidate.store.name}</strong> 은(는) 여기서{' '}
+              {distanceText(c.alternative.distanceKm)} 떨어져 있고,{' '}
+              <strong className="font-bold">
+                {STATUS_META[c.alternative.candidate.evaluation.status].label}
+              </strong>{' '}
+              입니다.
+            </p>
+            <p className="mt-0.5 text-[11.5px] text-navy-500">
+              출발지에서 {distanceText(c.alternative.candidate.travelKm)} ·{' '}
+              {formatDuration(c.alternative.candidate.travelMin)} · 도착 예정{' '}
+              {formatClock(c.alternative.candidate.arrivalMinutes)}
+            </p>
+            {onUseAlternative && (
+              <span
+                role="button"
+                tabIndex={0}
+                className="btn-primary mt-2 px-3 py-1.5 text-[12.5px]"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onUseAlternative(c.alternative!.candidate.store.id);
+                }}
+              >
+                <Repeat2 size={13} />이 장소로 바꿔 동선 다시 짜기
+              </span>
+            )}
+          </div>
+        )}
 
         {c.store.dataKind === 'live' && (
           <span
@@ -159,7 +203,7 @@ function CandidateCard({
   );
 }
 
-export function RouteResultList({ result, selectedId, onSelect }: Props) {
+export function RouteResultList({ result, selectedId, onSelect, onUseAlternative }: Props) {
   const { baseRoute, visitable, unvisitable, params } = result;
 
   return (
@@ -229,8 +273,40 @@ export function RouteResultList({ result, selectedId, onSelect }: Props) {
         )}
         <p className="mt-3 flex items-center gap-1.5 rounded-xl bg-rose-50 px-3.5 py-2.5 text-[12.5px] font-semibold text-rose-700">
           <Target size={13} />
-          도착지: {params.destination.name}
+          도착지: {params.destination.name} · 도착 예정{' '}
+          {formatClock(result.destinationArrivalMinutes)}
         </p>
+      </section>
+
+      {/* 도착지 주변 */}
+      <section className="card p-5">
+        <h3 className="flex items-center gap-2 text-[16px] font-bold text-navy-900">
+          <Target size={17} className="text-rose-600" />
+          도착지 주변 장소 · {params.destination.name}에서 가까운 순
+        </h3>
+        <p className="mt-1.5 text-[12.5px] leading-relaxed text-navy-500">
+          도착지에 도착하는 {formatClock(result.destinationArrivalMinutes)} 기준으로 영업 여부를
+          판정했습니다. 목적지에 도착한 뒤 들를 곳을 고를 때 사용하세요.
+        </p>
+        {result.nearDestination.length === 0 ? (
+          <p className="mt-3 rounded-xl border border-dashed border-navy-200 bg-navy-50/60 px-4 py-6 text-center text-[13.5px] text-navy-500">
+            도착지 반경 {Math.max(params.radiusKm, 1)}km 안에서 장소를 찾지 못했습니다. 검색 범위를
+            넓혀 보세요.
+          </p>
+        ) : (
+          <ol className="mt-3 space-y-2.5">
+            {result.nearDestination.map((c) => (
+              <CandidateCard
+                key={`dest-${c.store.id}`}
+                c={c}
+                selected={selectedId === c.store.id}
+                onSelect={() => onSelect(c.store.id)}
+                distanceLabel="도착지에서"
+                onUseAlternative={onUseAlternative}
+              />
+            ))}
+          </ol>
+        )}
       </section>
 
       {unvisitable.length > 0 && (
@@ -249,6 +325,7 @@ export function RouteResultList({ result, selectedId, onSelect }: Props) {
                 c={c}
                 selected={selectedId === c.store.id}
                 onSelect={() => onSelect(c.store.id)}
+                onUseAlternative={onUseAlternative}
               />
             ))}
           </ul>

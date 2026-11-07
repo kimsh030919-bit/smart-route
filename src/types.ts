@@ -173,6 +173,12 @@ export interface RouteCandidate {
   evaluation: StoreEvaluation;
   /** 방문 순번 (방문 가능한 가게만 부여) */
   order?: number;
+  /** 방문할 수 없을 때 제안하는 같은 업종의 대체 장소 */
+  alternative?: {
+    candidate: RouteCandidate;
+    /** 원래 가려던 장소에서 대체 장소까지의 직선거리(km) */
+    distanceKm: number;
+  };
 }
 
 export interface RouteSearchParams {
@@ -199,6 +205,10 @@ export interface RouteSearchResult {
   visitable: RouteCandidate[];
   /** 방문할 수 없는 가게 + 이유 */
   unvisitable: RouteCandidate[];
+  /** 도착지 주변 장소 (도착지에서 가까운 순). travelKm/travelMin은 도착지 기준 */
+  nearDestination: RouteCandidate[];
+  /** 도착지 도착 예정 시각(분) */
+  destinationArrivalMinutes: number;
   /** 검색 대상이 된 전체 가게 수 */
   scannedCount: number;
   /** 데이터 출처 안내 */

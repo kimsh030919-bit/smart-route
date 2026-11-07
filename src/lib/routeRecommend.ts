@@ -6,6 +6,7 @@ import type {
   Store,
 } from '../types';
 import { findStoresNearRoute, routeLengthKm } from './corridor';
+import { haversineKm } from './travel';
 import { findLiveStoresAlongRoute, mergeWithDb } from './liveStores';
 import { describeSupport, getMatrix, getRoute } from './routing';
 import { evaluateStore, storeToPlace } from './storeStatus';
@@ -64,6 +65,8 @@ export async function searchAlongRoute(params: RouteSearchParams): Promise<Route
       baseRoute,
       visitable: [],
       unvisitable: [],
+      nearDestination: [],
+      destinationArrivalMinutes: Math.round(startMinutes + baseRoute.durationMin),
       scannedCount: pool.length,
       notes: [
         ...notes,
@@ -72,8 +75,12 @@ export async function searchAlongRoute(params: RouteSearchParams): Promise<Route
     };
   }
 
-  // 5) 출발지 → 각 가게 실제 도로 이동거리/시간
-  const trimmed = hits.slice(0, Math.max(limit, 20));
+  // 5) 출발지 → 각 장소 실제 도로 이동거리/시간
+  //    영업정보가 등록된 DB 장소를 먼저 담고, 남는 자리를 지도 검색 결과로 채운다.
+  //    (그렇지 않으면 검색 결과가 많을 때 휴무·브레이크타임을 가진 DB 장소가 밀려난다)
+  const dbHits = hits.filter((h) => h.store.dataKind !== 'live');
+  const liveHits = hits.filter((h) => h.store.dataKind === 'live');
+  const trimmed = [...dbHits, ...liveHits].slice(0, Math.max(limit, 24));
   const matrix = await getMatrix([origin, ...trimmed.map((h) => h.store)], mode);
   const support = describeSupport(mode);
   if (!support.realRoad) notes.push(support.label);
@@ -113,14 +120,85 @@ export async function searchAlongRoute(params: RouteSearchParams): Promise<Route
     c.order = i + 1;
   });
 
+  // 방문할 수 없는 장소에는 같은 업종의 가장 가까운 대체 장소를 붙인다
+  attachAlternatives(unvisitable, visitable);
+
+  // 도착지 주변 장소 (도착지 도착 예정 시각 기준)
+  const destinationArrivalMinutes = Math.round(startMinutes + baseRoute.durationMin);
+  const nearDestination = await buildDestinationCandidates(
+    pool,
+    params,
+    destinationArrivalMinutes,
+  ).catch(() => [] as RouteCandidate[]);
+
   return {
     params,
     baseRoute,
     visitable: visitable.slice(0, limit),
     unvisitable,
+    nearDestination,
+    destinationArrivalMinutes,
     scannedCount: pool.length,
     notes,
   };
+}
+
+/**
+ * 방문할 수 없는 장소마다 "같은 업종 · 방문 가능 · 가장 가까운" 대체 장소를 찾아 붙인다.
+ * (같은 업종이 없으면 제안하지 않는다 — 억지로 다른 업종을 권하지 않음)
+ */
+function attachAlternatives(unvisitable: RouteCandidate[], visitable: RouteCandidate[]): void {
+  const MAX_ALT_KM = 5;
+  for (const u of unvisitable) {
+    const best = visitable
+      .filter((v) => v.store.category === u.store.category && v.store.id !== u.store.id)
+      .map((v) => ({ v, d: haversineKm(u.store, v.store) }))
+      .filter((x) => x.d <= MAX_ALT_KM)
+      .sort((a, b) => a.d - b.d)[0];
+    if (best) u.alternative = { candidate: best.v, distanceKm: best.d };
+  }
+}
+
+/** 도착지 주변 장소를 도착지 기준 실제 도로 거리로 정렬해 반환 */
+async function buildDestinationCandidates(
+  pool: Store[],
+  params: RouteSearchParams,
+  destinationArrivalMinutes: number,
+): Promise<RouteCandidate[]> {
+  const { destination, radiusKm, date, mode } = params;
+
+  const near = pool
+    .map((store) => ({ store, straightKm: haversineKm(destination, store) }))
+    .filter((x) => x.straightKm <= Math.max(radiusKm, 1))
+    .sort((a, b) => a.straightKm - b.straightKm)
+    .slice(0, 12);
+
+  if (near.length === 0) return [];
+
+  const matrix = await getMatrix([destination, ...near.map((n) => n.store)], mode);
+
+  const candidates: RouteCandidate[] = near.map((n, i) => {
+    const travelKm = matrix.km[0][i + 1];
+    const travelMin = matrix.minutes[0][i + 1];
+    const arrivalMinutes = Math.round(destinationArrivalMinutes + travelMin);
+    return {
+      store: n.store,
+      travelKm,
+      travelMin,
+      realRoad: matrix.realRoad,
+      realDuration: matrix.realDuration,
+      detourKm: n.straightKm,
+      alongKm: 0,
+      arrivalMinutes,
+      evaluation: evaluateStore(n.store, date, arrivalMinutes),
+    };
+  });
+
+  candidates.sort((a, b) => a.travelKm - b.travelKm);
+  candidates.slice(0, 6).forEach((c, i) => {
+    c.order = i + 1;
+  });
+  return candidates.slice(0, 6);
 }
 
 /**
@@ -132,9 +210,26 @@ export async function searchAlongRoute(params: RouteSearchParams): Promise<Route
 export async function buildOptimizedPlan(
   result: RouteSearchResult,
   maxStops = 6,
+  /** 반드시 포함할 장소 id (대체 장소로 교체했을 때 사용) */
+  pinnedIds: string[] = [],
 ): Promise<ScheduleResult | null> {
   const { params } = result;
-  const stores: Store[] = result.visitable.slice(0, maxStops).map((c) => c.store);
+
+  // 대체 장소 등 고정 선택을 앞에 두고, 나머지는 거리순으로 채운다
+  const everything = [...result.visitable, ...result.nearDestination];
+  const pinned = pinnedIds
+    .map((id) => everything.find((c) => c.store.id === id))
+    .filter((c): c is RouteCandidate => !!c);
+  const rest = result.visitable.filter((c) => !pinnedIds.includes(c.store.id));
+
+  const picked: RouteCandidate[] = [];
+  for (const c of [...pinned, ...rest]) {
+    if (picked.some((p) => p.store.id === c.store.id)) continue;
+    picked.push(c);
+    if (picked.length >= maxStops) break;
+  }
+
+  const stores: Store[] = picked.map((c) => c.store);
   if (stores.length < 2) return null;
 
   const matrix = await getMatrix([params.origin, ...stores], params.mode);

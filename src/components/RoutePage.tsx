@@ -42,11 +42,14 @@ export function RoutePage({ canSearchPlaces }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [layer, setLayer] = useState<VworldLayer>('Base');
+  /** 대체 장소로 교체해 반드시 포함시킬 장소 id */
+  const [pinnedIds, setPinnedIds] = useState<string[]>([]);
 
   const runSearch = useCallback(async () => {
     setLoading(true);
     setError(null);
     setPlan(null);
+    setPinnedIds([]);
     setMode('distance');
     try {
       const res = await searchAlongRoute(params);
@@ -67,26 +70,54 @@ export function RoutePage({ canSearchPlaces }: Props) {
     }
   }, [params]);
 
-  const runOptimize = useCallback(async () => {
-    if (!result) return;
-    setPlanning(true);
-    setError(null);
-    try {
-      const p = await buildOptimizedPlan(result);
-      if (!p) {
-        setError('최적 일정을 만들려면 방문 가능한 장소가 2곳 이상 필요합니다.');
-        return;
+  const runOptimize = useCallback(
+    async (pinned: string[] = pinnedIds) => {
+      if (!result) return;
+      setPlanning(true);
+      setError(null);
+      try {
+        const p = await buildOptimizedPlan(result, 6, pinned);
+        if (!p) {
+          setError('최적 일정을 만들려면 방문 가능한 장소가 2곳 이상 필요합니다.');
+          return;
+        }
+        setPlan(p);
+        setMode('optimized');
+      } catch (e) {
+        setError(
+          e instanceof Error ? `최적 일정 계산 실패: ${e.message}` : '최적 일정 계산에 실패했습니다.',
+        );
+      } finally {
+        setPlanning(false);
       }
-      setPlan(p);
-      setMode('optimized');
-    } catch (e) {
-      setError(e instanceof Error ? `최적 일정 계산 실패: ${e.message}` : '최적 일정 계산에 실패했습니다.');
-    } finally {
-      setPlanning(false);
-    }
-  }, [result]);
+    },
+    [result, pinnedIds],
+  );
 
-  const candidates = result ? [...result.visitable, ...result.unvisitable] : [];
+  /** 방문 불가 장소를 대체 장소로 바꾸고 동선을 다시 계산 */
+  const useAlternative = useCallback(
+    (altStoreId: string) => {
+      const next = pinnedIds.includes(altStoreId) ? pinnedIds : [...pinnedIds, altStoreId];
+      setPinnedIds(next);
+      setSelectedId(altStoreId);
+      void runOptimize(next);
+    },
+    [pinnedIds, runOptimize],
+  );
+
+  const pinnedNames = result
+    ? pinnedIds
+        .map(
+          (id) =>
+            [...result.visitable, ...result.nearDestination].find((c) => c.store.id === id)?.store
+              .name,
+        )
+        .filter((n): n is string => !!n)
+    : [];
+
+  const candidates = result
+    ? [...result.visitable, ...result.unvisitable, ...result.nearDestination]
+    : [];
 
   return (
     <section className="bg-white">
@@ -198,7 +229,7 @@ export function RoutePage({ canSearchPlaces }: Props) {
                   </button>
                   <button
                     type="button"
-                    onClick={plan ? () => setMode('optimized') : runOptimize}
+                    onClick={plan ? () => setMode('optimized') : () => void runOptimize()}
                     disabled={planning}
                     className={`btn px-4 py-2.5 ${
                       mode === 'optimized'
@@ -216,8 +247,30 @@ export function RoutePage({ canSearchPlaces }: Props) {
                   </span>
                 </div>
 
+                {pinnedNames.length > 0 && (
+                  <p className="flex flex-wrap items-center gap-1.5 rounded-xl bg-brand-50 px-3.5 py-2.5 text-[12.5px] text-brand-800">
+                    <strong className="font-bold">대체 장소 적용됨:</strong>
+                    {pinnedNames.join(', ')}
+                    <button
+                      type="button"
+                      className="btn-ghost px-2 py-0.5 text-[12px] text-brand-700"
+                      onClick={() => {
+                        setPinnedIds([]);
+                        void runOptimize([]);
+                      }}
+                    >
+                      되돌리기
+                    </button>
+                  </p>
+                )}
+
                 {mode === 'distance' ? (
-                  <RouteResultList result={result} selectedId={selectedId} onSelect={setSelectedId} />
+                  <RouteResultList
+                    result={result}
+                    selectedId={selectedId}
+                    onSelect={setSelectedId}
+                    onUseAlternative={useAlternative}
+                  />
                 ) : plan ? (
                   <div className="space-y-5">
                     <Timeline
