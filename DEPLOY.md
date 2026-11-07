@@ -1,15 +1,27 @@
 # SMART ROUTE 배포 가이드
 
-빌드 결과물은 `dist/` 폴더의 **정적 파일**입니다. 다만 브이월드 **검색·지오코더(JSON API)** 는 CORS 때문에
-브라우저에서 직접 호출할 수 없어, 중계용 서버리스 함수가 필요합니다. 그래서 플랫폼별로 아래처럼 갈립니다.
+빌드 결과물은 `dist/` 폴더의 **정적 파일**입니다. 브이월드 **검색·지오코더(JSON API)** 는 CORS 헤더를
+주지 않지만 **JSONP(`callback` 파라미터)를 지원**하므로, 서버가 없는 정적 호스팅에서도 호출할 수 있습니다.
+서버를 둘 수 있는 환경에서는 프록시(서버리스 함수) 방식이 더 안전합니다.
 
 | 플랫폼 | 설정 파일 | 브이월드 지도 타일 | 브이월드 검색/지오코더 | 카카오맵 | 데모 모드 |
 | --- | --- | --- | --- | --- | --- |
-| **Vercel** (권장) | `vercel.json` + `api/vworld/[...path].ts` | ✅ | ✅ | ✅ | ✅ |
-| **Netlify** | `netlify.toml` + `netlify/functions/vworld.mts` | ✅ | ✅ | ✅ | ✅ |
-| **Cloudflare Pages** | `functions/vworld-api/[[path]].ts` | ✅ | ✅ | ✅ | ✅ |
-| **GitHub Pages** | `.github/workflows/deploy-pages.yml` | ✅ | ❌ (함수 불가) | ✅ | ✅ |
-| **일반 웹호스팅 / FTP** | `npm run build:relative` | ✅ | ❌ | ✅ | ✅ |
+| **Vercel** (권장) | `vercel.json` + `api/vworld/[...path].ts` | ✅ | ✅ 프록시 | ✅ | ✅ |
+| **Netlify** | `netlify.toml` + `netlify/functions/vworld.mts` | ✅ | ✅ 프록시 | ✅ | ✅ |
+| **Cloudflare Pages** | `functions/vworld-api/[[path]].ts` | ✅ | ✅ 프록시 | ✅ | ✅ |
+| **GitHub Pages** | `.github/workflows/deploy-pages.yml` | ✅ | ✅ JSONP | ✅ | ✅ |
+| **일반 웹호스팅 / FTP** | `npm run build:relative` | ✅ | ✅ JSONP | ✅ | ✅ |
+
+### 검색 호출 방식 (`VITE_VWORLD_TRANSPORT`)
+
+| 값 | 동작 | 언제 |
+| --- | --- | --- |
+| `auto` (기본) | 개발 = 프록시, 배포 = JSONP. 프록시 실패 시 JSONP로 자동 폴백 | 대부분의 경우 |
+| `proxy` | 항상 서버 경유 | Vercel/Netlify/Cloudflare — 키를 서버에만 두고 싶을 때 |
+| `jsonp` | 항상 브라우저에서 api.vworld.kr 직접 호출 | 정적 호스팅 전용 |
+
+JSONP는 `api.vworld.kr` 의 스크립트를 페이지에서 실행하는 방식이라 그만큼 해당 도메인을 신뢰하게 됩니다.
+서버를 둘 수 있으면 `proxy` 를 쓰세요.
 
 > 어느 플랫폼이든 **데모 모드는 100% 동작**합니다. 키가 없어도 검색·최적화·타임라인·지도(개념도)가 모두
 > 작동하므로, 발표용으로는 키 없이 배포해도 시연에 문제가 없습니다.
@@ -105,7 +117,7 @@ Cloudflare 대시보드 → Settings → Environment variables 에 `VWORLD_API_K
 3. `main` 브랜치에 push → `.github/workflows/deploy-pages.yml` 이 자동 배포
 
 하위 경로(`https://계정.github.io/저장소명/`)에 올라가므로 워크플로가 `VITE_BASE`를 자동으로 넣습니다.
-**브이월드 검색·지오코더는 동작하지 않습니다**(서버리스 함수 불가). 지도 타일·카카오맵·데모는 정상입니다.
+서버리스 함수는 쓸 수 없지만, 브이월드 검색·지오코더는 **JSONP로 호출**되므로 정상 동작합니다.
 
 ## 5. 일반 웹호스팅 / FTP / 학교 서버 (파일만 올리는 경우)
 
@@ -118,7 +130,8 @@ npm run package:win         # dist 를 smart-route-dist.zip 으로 압축 (Windo
 
 - **`index.html`을 더블클릭(file://)하면 동작하지 않습니다.** ES 모듈이 차단되기 때문에 반드시 HTTP로
   서빙해야 합니다. 로컬 확인은 `npm run serve:dist` → http://localhost:4173
-- 브이월드 검색은 프록시가 없어 동작하지 않습니다. 지도 타일·카카오맵·데모 모드는 정상입니다.
+- 브이월드 검색은 JSONP로 호출되어 프록시 없이도 동작합니다. 인증키 **활용 URL**에 해당 도메인을
+  등록해 두세요.
 - Apache 등에서 하위 경로에 올렸다면 `base`가 `./` 이라 추가 설정이 필요 없습니다.
 
 ---

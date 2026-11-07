@@ -77,16 +77,17 @@ VWORLD_REFERER=http://localhost:5173
   `정보 확인 필요`로 표시되고, 장소 카드에서 직접 입력하면 동선 계산에 반영됩니다.
 - 길찾기 / 실시간 이동시간 → 브이월드에 없습니다. 이동시간은 계속 추정값입니다.
 
-**CORS 주의** — 타일(이미지)은 바로 쓸 수 있지만 검색·지오코더 **JSON API는 브라우저에서 직접 호출하면
-CORS에 막힙니다.** 그래서 `vite.config.ts`에 개발 프록시를 넣어 두었습니다.
+**CORS 주의** — 타일(이미지)은 바로 쓸 수 있지만, 검색·지오코더 **JSON API는 CORS 헤더를 주지 않습니다.**
+두 가지 경로를 모두 지원합니다. (`VITE_VWORLD_TRANSPORT` 로 선택, 기본 `auto`)
 
-```
-브라우저 → /vworld-api/req/search → (vite dev server, Referer 주입) → https://api.vworld.kr/req/search
-```
+| 방식 | 경로 | 비고 |
+| --- | --- | --- |
+| 프록시 (개발 기본) | 브라우저 → `/vworld-api/req/search` → vite dev server(Referer 주입) → `api.vworld.kr` | 배포 시엔 서버리스 함수가 같은 역할 (`api/`, `netlify/`, `functions/`) |
+| JSONP (배포 기본) | 브라우저 → `api.vworld.kr/req/search?...&callback=...` | 서버가 없는 정적 호스팅(GitHub Pages 등)에서도 검색 가능 |
 
-운영 배포 시에는 같은 역할의 서버(BFF: Node/Express, Next.js route handler, Cloudflare Worker 등)에서
-중계해야 하며, 인증키는 서버에만 두는 것이 안전합니다. (현재는 프로토타입이라 `VITE_` 변수로 클라이언트에
-노출됩니다 — 운영 전환 시 반드시 서버로 옮기세요.)
+`auto` 는 개발에서 프록시를, 배포에서 JSONP를 쓰고, 프록시 호출이 실패하면 JSONP로 자동 폴백합니다.
+서버를 둘 수 있는 환경이라면 `VITE_VWORLD_TRANSPORT=proxy` + 서버 전용 `VWORLD_API_KEY` 조합이 가장
+안전합니다. (JSONP는 `api.vworld.kr` 스크립트를 페이지에서 실행하므로 그 도메인을 신뢰하게 됩니다)
 
 ### 카카오맵 연결하기
 
@@ -165,7 +166,7 @@ VITE_KAKAO_MAP_KEY=발급받은_JavaScript_키
 | 항목 | 현재 상태 | 실제 연동 방법 |
 | --- | --- | --- |
 | 지도 표시 | 브이월드 WMTS(키 있을 때) / 카카오맵 SDK(키 있을 때) / 데모 개념도 — 화면에서 전환 가능 | `VITE_VWORLD_API_KEY` 또는 `VITE_KAKAO_MAP_KEY` 설정 |
-| 장소 검색 | 브이월드 검색 API · 카카오 키워드 검색 · 데모 데이터 — 화면에서 전환 가능 | 동일 |
+| 장소 검색 | 브이월드 검색 API(프록시 또는 JSONP) · 카카오 키워드 검색 · 데모 데이터 — 화면에서 전환 가능 | 동일 |
 | 출발지 주소 검색 | 카카오 키워드 검색 → 없으면 브이월드 검색/지오코더 | 동일 |
 | **영업시간·휴무·브레이크타임** | **어떤 API로도 가져오지 않음.** (브이월드·카카오 모두 제공하지 않음) 데모 데이터이거나 사용자 입력. 미확인 시 `정보 확인 필요` | 구글 Places `opening_hours`, 네이버 플레이스 등 유료·승인 필요 API 연동, 또는 자체 DB 구축 |
 | **이동시간·이동거리** | **실시간 교통정보 아님.** 직선거리(Haversine) × 우회계수 ÷ 이동수단 평균속도 + 고정 오버헤드 | 카카오내비 길찾기 API, ODsay(대중교통), Google Directions 등 |

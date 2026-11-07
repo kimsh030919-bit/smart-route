@@ -62,7 +62,80 @@ const API_BASE: string = (import.meta.env.VITE_VWORLD_PROXY_BASE ?? '/vworld-api
   '',
 );
 
+/**
+ * 호출 방식
+ *  - 'proxy' : 서버(프록시) 경유 fetch. 키를 서버에 둘 수 있어 가장 안전하다.
+ *  - 'jsonp' : 브라우저에서 api.vworld.kr 을 직접 호출. 브이월드가 callback 파라미터(JSONP)를
+ *              지원하므로 CORS 제약을 받지 않는다. 서버가 없는 정적 호스팅(GitHub Pages 등)에서 사용.
+ *  - 'auto'  : 개발 환경은 proxy, 배포 환경은 jsonp (기본값)
+ *
+ * JSONP는 api.vworld.kr 의 스크립트를 페이지에서 실행하는 방식이라 그만큼 해당 도메인을 신뢰하게 된다.
+ * 서버를 둘 수 있는 환경(Vercel/Netlify/Cloudflare)에서는 VITE_VWORLD_TRANSPORT=proxy 를 권장한다.
+ */
+type Transport = 'auto' | 'proxy' | 'jsonp';
+const TRANSPORT: Transport = ((import.meta.env.VITE_VWORLD_TRANSPORT as Transport) ?? 'auto').trim() as Transport;
+
+function resolveTransport(): 'proxy' | 'jsonp' {
+  if (TRANSPORT === 'proxy' || TRANSPORT === 'jsonp') return TRANSPORT;
+  return import.meta.env.DEV ? 'proxy' : 'jsonp';
+}
+
+let jsonpSeq = 0;
+
+/** JSONP 호출 (CORS 우회). 12초 내 응답이 없으면 실패 처리. */
+function jsonp<T>(path: string, params: Record<string, string>): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    if (typeof document === 'undefined') {
+      reject(new Error('브라우저 환경에서만 호출할 수 있습니다.'));
+      return;
+    }
+    jsonpSeq += 1;
+    const cbName = `__vworldCb${jsonpSeq}_${Date.now().toString(36)}`;
+    const qs = new URLSearchParams({ ...params, key: VWORLD_API_KEY, callback: cbName });
+    const script = document.createElement('script');
+
+    const globalScope = window as unknown as Record<string, unknown>;
+    let timer = 0;
+    const cleanup = () => {
+      window.clearTimeout(timer);
+      delete globalScope[cbName];
+      script.remove();
+    };
+
+    globalScope[cbName] = (data: T) => {
+      cleanup();
+      resolve(data);
+    };
+    script.onerror = () => {
+      cleanup();
+      reject(
+        new Error(
+          '브이월드 API를 호출하지 못했습니다. 인증키의 활용 URL에 현재 도메인이 등록되어 있는지 확인해 주세요.',
+        ),
+      );
+    };
+    timer = window.setTimeout(() => {
+      cleanup();
+      reject(new Error('브이월드 API 응답 시간이 초과되었습니다. 잠시 후 다시 시도해 주세요.'));
+    }, 12000);
+
+    script.src = `https://api.vworld.kr${path}?${qs.toString()}`;
+    document.head.appendChild(script);
+  });
+}
+
 async function getJson<T>(path: string, params: Record<string, string>): Promise<T> {
+  if (resolveTransport() === 'jsonp') return jsonp<T>(path, params);
+  try {
+    return await getJsonViaProxy<T>(path, params);
+  } catch (e) {
+    // 'proxy'를 명시한 경우에는 그대로 실패시키고, auto 모드면 JSONP로 자동 폴백한다.
+    if (TRANSPORT === 'proxy') throw e;
+    return jsonp<T>(path, params);
+  }
+}
+
+async function getJsonViaProxy<T>(path: string, params: Record<string, string>): Promise<T> {
   const qs = new URLSearchParams({ ...params, key: VWORLD_API_KEY }).toString();
   let res: Response;
   try {
@@ -74,7 +147,7 @@ async function getJson<T>(path: string, params: Record<string, string>): Promise
   }
   if (res.status === 404) {
     throw new Error(
-      '브이월드 프록시 경로를 찾을 수 없습니다. 배포 환경에 서버리스 함수(/vworld-api)가 포함되었는지 확인해 주세요. (정적 호스팅만 쓰는 경우 브이월드 검색은 사용할 수 없습니다)',
+      '브이월드 프록시 경로(/vworld-api)를 찾을 수 없습니다. 서버리스 함수가 배포되지 않았거나 경로가 다릅니다.',
     );
   }
   if (!res.ok) {
