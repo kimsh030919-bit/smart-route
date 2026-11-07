@@ -95,8 +95,13 @@ Cloudflare 대시보드 → Settings → Environment variables 에 `VWORLD_API_K
 ## 4. GitHub Pages
 
 1. 저장소 **Settings → Pages → Source: GitHub Actions**
-2. (선택) **Settings → Secrets and variables → Actions → Variables** 에
+2. (선택) **Settings → Secrets and variables → Actions → Secrets** 에
    `VITE_KAKAO_MAP_KEY`, `VITE_VWORLD_API_KEY` 추가
+   ```bash
+   gh secret set VITE_VWORLD_API_KEY --repo <계정>/<저장소>
+   ```
+   시크릿으로 넣어도 `VITE_` 변수는 **빌드된 JS에 포함되어 공개 사이트에서 볼 수 있습니다.**
+   로그 노출만 막는 것이고, 키 보호는 브이월드 **활용 URL** / 카카오 **사이트 도메인** 제한에 의존합니다.
 3. `main` 브랜치에 push → `.github/workflows/deploy-pages.yml` 이 자동 배포
 
 하위 경로(`https://계정.github.io/저장소명/`)에 올라가므로 워크플로가 `VITE_BASE`를 자동으로 넣습니다.

@@ -7,10 +7,12 @@ name: Deploy to GitHub Pages
 #
 # 사전 설정
 #  1) 저장소 Settings → Pages → Source: "GitHub Actions"
-#  2) 저장소 Settings → Secrets and variables → Actions → Variables 에 추가(선택)
+#  2) 저장소 Settings → Secrets and variables → Actions → Secrets 에 추가(선택)
 #       VITE_KAKAO_MAP_KEY   카카오 JavaScript 키
 #       VITE_VWORLD_API_KEY  브이월드 인증키 (타일용)
 #     ※ 두 키 모두 활용 URL/사이트 도메인에 https://<계정>.github.io 를 등록해야 합니다.
+#     ※ 시크릿으로 넣어도 클라이언트 번들(VITE_ 접두사)에 포함되어 배포된 JS에서는 보입니다.
+#        로그 노출만 막아 주는 것이며, 키 보호는 활용 URL/도메인 제한에 의존합니다.
 
 on:
   push:
@@ -43,8 +45,8 @@ jobs:
         env:
           # 저장소 이름이 곧 Pages 하위 경로가 된다
           VITE_BASE: /${{ github.event.repository.name }}/
-          VITE_KAKAO_MAP_KEY: ${{ vars.VITE_KAKAO_MAP_KEY }}
-          VITE_VWORLD_API_KEY: ${{ vars.VITE_VWORLD_API_KEY }}
+          VITE_KAKAO_MAP_KEY: ${{ secrets.VITE_KAKAO_MAP_KEY }}
+          VITE_VWORLD_API_KEY: ${{ secrets.VITE_VWORLD_API_KEY }}
         run: npm run build
 
       - name: SPA fallback (404.html)
