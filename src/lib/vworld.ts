@@ -190,6 +190,28 @@ export interface VworldSearchOptions {
   origin?: Origin | null;
   /** bbox 반경(km) */
   radiusKm?: number;
+  /** 직접 지정하는 bbox "minLng,minLat,maxLng,maxLat" (origin/radiusKm보다 우선) */
+  bbox?: string;
+}
+
+/** 좌표 목록을 모두 포함하는 bbox 문자열 (padKm 만큼 여유) */
+export function bboxOfPoints(
+  points: { lat: number; lng: number }[],
+  padKm: number,
+): string | null {
+  if (points.length === 0) return null;
+  const lats = points.map((p) => p.lat);
+  const lngs = points.map((p) => p.lng);
+  const latRef = (Math.min(...lats) + Math.max(...lats)) / 2;
+  const dLat = padKm / 111;
+  const dLng = padKm / (111 * Math.max(0.2, Math.cos((latRef * Math.PI) / 180)));
+  const f = (n: number) => n.toFixed(6);
+  return [
+    f(Math.min(...lngs) - dLng),
+    f(Math.min(...lats) - dLat),
+    f(Math.max(...lngs) + dLng),
+    f(Math.max(...lats) + dLat),
+  ].join(',');
 }
 
 /**
@@ -214,7 +236,7 @@ function bboxAround(origin: Origin, radiusKm: number): string {
  */
 export async function searchVworldPlaces(
   query: string,
-  { type = 'place', size = 20, origin = null, radiusKm }: VworldSearchOptions = {},
+  { type = 'place', size = 20, origin = null, radiusKm, bbox }: VworldSearchOptions = {},
 ): Promise<PlaceSearchResult[]> {
   const params: Record<string, string> = {
     service: 'search',
@@ -229,7 +251,8 @@ export async function searchVworldPlaces(
     errorformat: 'json',
   };
   if (type === 'address') params.category = 'road';
-  if (origin && radiusKm) params.bbox = bboxAround(origin, radiusKm);
+  if (bbox) params.bbox = bbox;
+  else if (origin && radiusKm) params.bbox = bboxAround(origin, radiusKm);
 
   const json = await getJson<VworldSearchResponse>('/req/search', params);
   const status = json.response?.status;

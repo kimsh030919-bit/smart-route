@@ -1,4 +1,16 @@
-import { AlertTriangle, Clock, Coffee, Flag, MapPin, Route, Target, Timer, XCircle } from 'lucide-react';
+import {
+  AlertTriangle,
+  Clock,
+  Coffee,
+  Database,
+  Flag,
+  MapPin,
+  Route,
+  Target,
+  Timer,
+  XCircle,
+} from 'lucide-react';
+import { upsertStore } from '../lib/storeDb';
 import type { RouteCandidate, RouteSearchResult } from '../types';
 import { CATEGORY_META } from '../data/categories';
 import { STATUS_META } from '../lib/storeStatus';
@@ -52,7 +64,15 @@ function CandidateCard({
           <span className="text-[14.5px] font-bold text-navy-900">{c.store.name}</span>
           <span className={`chip ${meta.bg}`}>{meta.label}</span>
           <span className={`chip ${status.chip}`}>{status.label}</span>
-          {c.store.dataKind === 'demo' && <span className="chip bg-navy-100 text-navy-600">데모 데이터</span>}
+          {c.store.dataKind === 'demo' && (
+            <span className="chip bg-navy-100 text-navy-600">데모 데이터</span>
+          )}
+          {c.store.dataKind === 'live' && (
+            <span className="chip bg-sky-50 text-sky-700">지도 검색 결과</span>
+          )}
+          {c.store.dataKind === 'real' && (
+            <span className="chip bg-emerald-50 text-emerald-700">확인된 정보</span>
+          )}
         </div>
 
         <p className="mt-1.5 flex items-center gap-1 truncate text-[12px] text-navy-400">
@@ -92,6 +112,24 @@ function CandidateCard({
         >
           {c.evaluation.detail}
         </p>
+
+        {c.store.dataKind === 'live' && (
+          <span
+            role="button"
+            tabIndex={0}
+            className="btn-secondary mt-2 px-2.5 py-1.5 text-[12px]"
+            onClick={(e) => {
+              e.stopPropagation();
+              upsertStore({ ...c.store, dataKind: 'real' });
+              alert(
+                `"${c.store.name}" 을(를) 장소 DB에 등록했습니다.\n장소 정보 관리 메뉴에서 영업시간·휴무·브레이크 타임을 입력하면 다음 검색부터 반영됩니다.`,
+              );
+            }}
+          >
+            <Database size={13} />
+            이 장소를 DB에 등록
+          </span>
+        )}
 
         <p className="mt-1.5 text-[11.5px] text-navy-400">
           {c.store.verifiedAt ? (

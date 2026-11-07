@@ -5,7 +5,8 @@ import type {
   ScheduleResult,
   Store,
 } from '../types';
-import { findStoresNearRoute } from './corridor';
+import { findStoresNearRoute, routeLengthKm } from './corridor';
+import { findLiveStoresAlongRoute, mergeWithDb } from './liveStores';
 import { describeSupport, getMatrix, getRoute } from './routing';
 import { evaluateStore, storeToPlace } from './storeStatus';
 import { getStores } from './storeDb';
@@ -36,9 +37,26 @@ export async function searchAlongRoute(params: RouteSearchParams): Promise<Route
 
   // 3~4) 경로 주변 가게 추출
   const all = getStores();
-  const filtered =
+  const dbFiltered =
     categories.length > 0 ? all.filter((s) => categories.includes(s.category)) : all;
-  const hits = findStoresNearRoute(filtered, baseRoute.geometry, radiusKm);
+
+  // 3-b) DB에 등록이 없는 지역도 추천이 나오도록 경로 주변을 지도 검색으로 보충한다
+  const live = await findLiveStoresAlongRoute(
+    baseRoute.geometry,
+    radiusKm,
+    categories,
+    routeLengthKm(baseRoute.geometry),
+  ).catch(() => ({ stores: [] as typeof all, requests: 0, note: null as string | null }));
+
+  const liveFiltered =
+    categories.length > 0
+      ? live.stores.filter((s) => categories.includes(s.category))
+      : live.stores;
+
+  const pool = mergeWithDb(dbFiltered, liveFiltered);
+  if (live.note) notes.push(live.note);
+
+  const hits = findStoresNearRoute(pool, baseRoute.geometry, radiusKm);
 
   if (hits.length === 0) {
     return {
@@ -46,10 +64,10 @@ export async function searchAlongRoute(params: RouteSearchParams): Promise<Route
       baseRoute,
       visitable: [],
       unvisitable: [],
-      scannedCount: filtered.length,
+      scannedCount: pool.length,
       notes: [
         ...notes,
-        `경로 반경 ${radiusKm}km 안에 등록된 장소가 없습니다. 반경을 넓히거나 관리자 페이지에서 장소를 등록해 주세요.`,
+        `경로 반경 ${radiusKm}km 안에서 장소를 찾지 못했습니다. 검색 범위를 넓히거나 업종 필터를 해제해 보세요.`,
       ],
     };
   }
@@ -100,7 +118,7 @@ export async function searchAlongRoute(params: RouteSearchParams): Promise<Route
     baseRoute,
     visitable: visitable.slice(0, limit),
     unvisitable,
-    scannedCount: filtered.length,
+    scannedCount: pool.length,
     notes,
   };
 }

@@ -84,8 +84,10 @@ export interface TempClosure {
  * 데이터 종류
  *  - real : 실제로 확인한 장소 (출처/확인일 보유)
  *  - demo : 알고리즘 시연용 가상 가게 (이름에 [데모] 표기)
+ *  - live : 지도 검색 API에서 실시간으로 찾은 실제 장소.
+ *           이름·주소·좌표는 실제지만 영업정보는 제공되지 않아 항상 "정보 없음"이다.
  */
-export type StoreDataKind = 'real' | 'demo';
+export type StoreDataKind = 'real' | 'demo' | 'live';
 
 export interface Store {
   id: string;
