@@ -12,9 +12,6 @@ import {
   Wand2,
 } from 'lucide-react';
 import { Header } from './components/Header';
-import { RoutePage } from './components/RoutePage';
-import { AdminPage } from './components/AdminPage';
-import { hasVworldKey } from './lib/vworld';
 import { TripSettingsCard } from './components/TripSettingsCard';
 import { PlaceSearchPanel } from './components/PlaceSearchPanel';
 import { PlaceCard } from './components/PlaceCard';
@@ -57,31 +54,9 @@ function toPlace(r: PlaceSearchResult): Place {
   };
 }
 
-export type View = 'route' | 'planner' | 'admin';
-
-function viewFromHash(): View {
-  const h = window.location.hash.replace(/^#\/?/, '');
-  if (h === 'planner' || h === 'admin') return h;
-  return 'route';
-}
-
 export default function App() {
   const { status: kakaoStatus, error: kakaoError } = useKakaoLoader();
   const kakaoReady = kakaoStatus === 'ready';
-
-  const [view, setView] = useState<View>(() => viewFromHash());
-
-  useEffect(() => {
-    const onHash = () => setView(viewFromHash());
-    window.addEventListener('hashchange', onHash);
-    return () => window.removeEventListener('hashchange', onHash);
-  }, []);
-
-  const navigate = useCallback((next: View) => {
-    window.location.hash = next === 'route' ? '/' : `/${next}`;
-    setView(next);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  }, []);
 
   const persisted = useMemo(() => loadState(), []);
   const [places, setPlaces] = useState<Place[]>(persisted?.places ?? []);
@@ -208,19 +183,8 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-white">
-      <Header
-        kakaoStatus={kakaoStatus}
-        view={view}
-        onNavigate={navigate}
-        onStart={() => (view === 'planner' ? scrollTo(plannerRef) : navigate('planner'))}
-      />
+      <Header kakaoStatus={kakaoStatus} onStart={() => scrollTo(plannerRef)} />
       <main>
-        {view === 'route' && <RoutePage canSearchPlaces={kakaoReady || hasVworldKey()} />}
-
-        {view === 'admin' && <AdminPage />}
-
-        {view === 'planner' && (
-          <>
         <section ref={plannerRef} id="planner" className="scroll-mt-20 bg-white">
           <div className="mx-auto max-w-6xl px-4 py-14 sm:px-6">
             <h2 className="text-[26px] font-extrabold tracking-tight text-navy-900 sm:text-[30px]">
@@ -455,8 +419,6 @@ export default function App() {
             )}
           </div>
         </section>
-          </>
-        )}
       </main>
       <Footer />
     </div>
