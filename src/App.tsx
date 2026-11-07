@@ -12,8 +12,6 @@ import {
   Wand2,
 } from 'lucide-react';
 import { Header } from './components/Header';
-import { Hero } from './components/Hero';
-import { Features } from './components/Features';
 import { RoutePage } from './components/RoutePage';
 import { AdminPage } from './components/AdminPage';
 import { hasVworldKey } from './lib/vworld';
@@ -217,25 +215,12 @@ export default function App() {
         onStart={() => (view === 'planner' ? scrollTo(plannerRef) : navigate('planner'))}
       />
       <main>
-        {view === 'route' && (
-          <>
-            <Hero
-              onStart={() => navigate('planner')}
-              onDemo={() => {
-                quickDemo();
-                navigate('planner');
-              }}
-            />
-            <RoutePage canSearchPlaces={kakaoReady || hasVworldKey()} />
-          </>
-        )}
+        {view === 'route' && <RoutePage canSearchPlaces={kakaoReady || hasVworldKey()} />}
 
         {view === 'admin' && <AdminPage />}
 
         {view === 'planner' && (
           <>
-            <Features />
-
         <section ref={plannerRef} id="planner" className="scroll-mt-20 bg-white">
           <div className="mx-auto max-w-6xl px-4 py-14 sm:px-6">
             <h2 className="text-[26px] font-extrabold tracking-tight text-navy-900 sm:text-[30px]">
@@ -275,19 +260,25 @@ export default function App() {
                         {places.length} / {MAX_PLACES}
                       </span>
                     </h3>
-                    {places.length > 0 && (
-                      <button
-                        type="button"
-                        className="btn-ghost text-[12.5px]"
-                        onClick={() => {
-                          setPlaces([]);
-                          setResult(null);
-                        }}
-                      >
-                        <Trash2 size={13} />
-                        전체 삭제
+                    <div className="flex items-center gap-1">
+                      <button type="button" className="btn-ghost text-[12.5px]" onClick={quickDemo}>
+                        <Sparkles size={13} />
+                        데모 장소 불러오기
                       </button>
-                    )}
+                      {places.length > 0 && (
+                        <button
+                          type="button"
+                          className="btn-ghost text-[12.5px]"
+                          onClick={() => {
+                            setPlaces([]);
+                            setResult(null);
+                          }}
+                        >
+                          <Trash2 size={13} />
+                          전체 삭제
+                        </button>
+                      )}
+                    </div>
                   </div>
 
                   {places.length === 0 ? (
