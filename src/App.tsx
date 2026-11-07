@@ -17,7 +17,6 @@ import { Features } from './components/Features';
 import { TripSettingsCard } from './components/TripSettingsCard';
 import { PlaceSearchPanel } from './components/PlaceSearchPanel';
 import { PlaceCard } from './components/PlaceCard';
-import { DemoScenarioBar } from './components/DemoScenarioBar';
 import { RouteMap } from './components/RouteMap';
 import { SummaryStats } from './components/SummaryStats';
 import { Timeline } from './components/Timeline';
@@ -69,7 +68,6 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [fixedOrder, setFixedOrder] = useState(false);
-  const [scenarioId, setScenarioId] = useState<string | null>(null);
   const [stale, setStale] = useState(false);
 
   const plannerRef = useRef<HTMLDivElement>(null);
@@ -166,7 +164,6 @@ export default function App() {
       origin: DEMO_ORIGINS[s.originIndex] ?? DEMO_ORIGINS[0],
     });
     setFixedOrder(false);
-    setScenarioId(s.id);
     setResult(null);
     setError(null);
     setTimeout(() => scrollTo(plannerRef), 50);
@@ -210,11 +207,7 @@ export default function App() {
               </p>
             )}
 
-            <div className="mt-6">
-              <DemoScenarioBar onApply={applyScenario} activeId={scenarioId} />
-            </div>
-
-            <div className="mt-6 grid gap-6 lg:grid-cols-2">
+            <div className="mt-8 grid gap-6 lg:grid-cols-2">
               <div className="space-y-6">
                 <TripSettingsCard settings={settings} onChange={setSettings} kakaoReady={kakaoReady} />
                 <PlaceSearchPanel
@@ -243,7 +236,6 @@ export default function App() {
                         onClick={() => {
                           setPlaces([]);
                           setResult(null);
-                          setScenarioId(null);
                         }}
                       >
                         <Trash2 size={13} />

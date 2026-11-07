@@ -15,10 +15,12 @@ const STATUS_TEXT: Record<KakaoStatus, { label: string; cls: string }> = {
 };
 
 export function Header({ kakaoStatus, onStart }: Props) {
-  const status =
-    kakaoStatus === 'demo' && hasVworldKey()
-      ? { label: '카카오맵 키 없음 (장소 검색은 브이월드)', cls: 'bg-navy-50 text-navy-600' }
-      : STATUS_TEXT[kakaoStatus];
+  // 카카오 상태는 "연결됨 / 오류"일 때만 노출한다.
+  // (브이월드만 쓰는 경우 "카카오맵 키 없음" 배지는 불필요한 노이즈)
+  // 지도 키가 하나도 없을 때는 데모 모드임을 반드시 알린다.
+  const showKakaoStatus =
+    kakaoStatus === 'ready' || kakaoStatus === 'error' || !hasVworldKey();
+  const status = STATUS_TEXT[kakaoStatus];
   return (
     <header className="sticky top-0 z-40 border-b border-navy-100 bg-white/85 backdrop-blur">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6">
@@ -43,10 +45,12 @@ export function Header({ kakaoStatus, onStart }: Props) {
               브이월드 연결됨
             </span>
           )}
-          <span className={`chip hidden sm:inline-flex ${status.cls}`}>
-            <Sparkles size={13} />
-            {status.label}
-          </span>
+          {showKakaoStatus && (
+            <span className={`chip hidden sm:inline-flex ${status.cls}`}>
+              <Sparkles size={13} />
+              {status.label}
+            </span>
+          )}
           <button type="button" onClick={onStart} className="btn-primary px-4 py-2 text-sm">
             나만의 일정 만들기
           </button>
