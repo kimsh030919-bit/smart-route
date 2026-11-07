@@ -88,7 +88,8 @@ export const CATEGORY_LIST = Object.values(CATEGORY_META);
  */
 export function categoryFromVworld(category: string, name: string): Category {
   const hay = `${category} ${name}`;
-  if (/카페|커피|coffee|cafe|베이커리|제과/i.test(hay)) return 'cafe';
+  // 빵/도넛/디저트 업종은 카페로 분류 (브이월드는 베이커리를 음식점업 하위로 둔다)
+  if (/카페|커피|coffee|cafe|베이커리|제과|빵|도넛|디저트|티룸/i.test(hay)) return 'cafe';
   if (/음식|식당|맛집|한식|중식|일식|양식|분식|국밥|고기|초밥|파스타|레스토랑/.test(hay)) return 'food';
   if (/공원|숲|호수|녹지|유원지|수목원/.test(hay)) return 'park';
   if (/영화|시네마|cgv|메가박스|롯데시네마/i.test(hay)) return 'cinema';

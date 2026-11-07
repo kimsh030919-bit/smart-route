@@ -20,6 +20,7 @@ import { SummaryStats } from './components/SummaryStats';
 import { Timeline } from './components/Timeline';
 import { ComparisonCard } from './components/ComparisonCard';
 import { WarningPanel } from './components/WarningPanel';
+import { AlternativesCard } from './components/AlternativesCard';
 import { Footer } from './components/Footer';
 import { useKakaoLoader } from './hooks/useKakaoLoader';
 import { DEMO_ORIGINS, DEMO_PLACES, nextDateForWeekday, type DemoScenario } from './data/demoPlaces';
@@ -111,13 +112,15 @@ export default function App() {
     });
   }, []);
 
-  const calculate = useCallback(() => {
+  const calculate = useCallback(
+    (placesOverride?: Place[]) => {
+    const target = placesOverride ?? places;
     setError(null);
-    if (places.length < MIN_PLACES) {
-      setError(`장소를 최소 ${MIN_PLACES}곳 이상 추가해 주세요. (현재 ${places.length}곳)`);
+    if (target.length < MIN_PLACES) {
+      setError(`장소를 최소 ${MIN_PLACES}곳 이상 추가해 주세요. (현재 ${target.length}곳)`);
       return;
     }
-    if (places.length > MAX_PLACES) {
+    if (target.length > MAX_PLACES) {
       setError(`장소는 최대 ${MAX_PLACES}곳까지 계산할 수 있습니다.`);
       return;
     }
@@ -125,7 +128,7 @@ export default function App() {
     // UI가 로딩 상태를 그릴 수 있도록 다음 프레임에 계산
     window.setTimeout(() => {
       try {
-        const res = optimizeSchedule(places, settings, { fixedOrder });
+        const res = optimizeSchedule(target, settings, { fixedOrder });
         setResult(res);
         setStale(false);
         setSelectedId(null);
@@ -146,7 +149,23 @@ export default function App() {
         setCalculating(false);
       }
     }, 30);
-  }, [places, settings, fixedOrder]);
+    },
+    [places, settings, fixedOrder],
+  );
+
+  /** 문 닫은 장소를 주변 대체 장소로 바꾸고 바로 다시 계산 */
+  const replaceWithAlternative = useCallback(
+    (oldPlaceId: string, next: Place) => {
+      const updated = places.map((p) => (p.id === oldPlaceId ? next : p));
+      // 이미 담겨 있는 장소로 교체하려는 경우엔 중복을 제거한다
+      const deduped = updated.filter(
+        (p, i) => updated.findIndex((o) => o.id === p.id) === i,
+      );
+      setPlaces(deduped);
+      calculate(deduped);
+    },
+    [places, calculate],
+  );
 
   const applyScenario = useCallback((s: DemoScenario) => {
     const picked = s.placeIds
@@ -314,7 +333,7 @@ export default function App() {
 
                   <button
                     type="button"
-                    onClick={calculate}
+                    onClick={() => calculate()}
                     disabled={calculating}
                     className="btn-primary mt-4 w-full py-3.5 text-[16px]"
                   >
@@ -375,7 +394,7 @@ export default function App() {
                       )}
                     </p>
                   </div>
-                  <button type="button" onClick={calculate} className="btn-secondary py-3">
+                  <button type="button" onClick={() => calculate()} className="btn-secondary py-3">
                     <RefreshCw size={16} />
                     일정 다시 계산하기
                   </button>
@@ -407,12 +426,28 @@ export default function App() {
                       />
                     </div>
                     <div className="space-y-6 lg:col-span-2">
+                      {result.excluded.length > 0 && (
+                        <AlternativesCard
+                          excluded={result.excluded}
+                          onReplace={replaceWithAlternative}
+                        />
+                      )}
                       <WarningPanel result={result} />
                     </div>
                   </div>
                 )}
 
-                {result.stops.length === 0 && <WarningPanel result={result} />}
+                {result.stops.length === 0 && (
+                  <>
+                    {result.excluded.length > 0 && (
+                      <AlternativesCard
+                        excluded={result.excluded}
+                        onReplace={replaceWithAlternative}
+                      />
+                    )}
+                    <WarningPanel result={result} />
+                  </>
+                )}
 
                 <ComparisonCard result={result} />
               </div>
