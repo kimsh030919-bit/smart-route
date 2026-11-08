@@ -31,7 +31,7 @@ export function HeroImage() {
     <div
       ref={ref}
       aria-hidden
-      className="relative h-[240px] w-full overflow-hidden bg-white sm:h-[320px] lg:h-[400px]"
+      className="relative h-[260px] w-full overflow-hidden bg-white sm:h-[360px] lg:h-[460px] xl:h-[520px]"
     >
       <div
         className="absolute inset-0 will-change-transform"
@@ -41,17 +41,21 @@ export function HeroImage() {
           transform: `scale(${1 + progress * 0.06}) translateY(${progress * -24}px)`,
         }}
       >
+        {/*
+          object-top: 가로가 넓어 세로가 잘릴 때 위쪽(하늘·남산타워)을 남기고
+          아래쪽 기와지붕부터 잘라 낸다. 하단은 어차피 흰색 그라데이션으로 덮인다.
+        */}
         <img
           src={heroSeoul}
           alt=""
-          className="h-full w-full object-cover"
+          className="h-full w-full object-cover object-top"
           loading="eager"
           decoding="async"
         />
         {/* 하단 그라데이션: 사진이 흰 배경으로 자연스럽게 녹아들게 */}
         <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-b from-transparent via-white/60 to-white" />
-        {/* 상단도 살짝 밝혀 헤더와의 경계를 부드럽게 */}
-        <div className="pointer-events-none absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-white/70 to-transparent" />
+        {/* 상단은 아주 옅게만 — 하늘과 남산타워가 흐려지지 않도록 */}
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-10 bg-gradient-to-b from-white/35 to-transparent" />
       </div>
     </div>
   );
