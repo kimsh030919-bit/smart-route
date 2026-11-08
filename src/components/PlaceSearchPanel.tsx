@@ -11,7 +11,6 @@ import {
 } from '../lib/placeSearch';
 import { searchDemoPlaces } from '../data/demoPlaces';
 import { hoursSummary } from '../lib/businessHours';
-import { isEstimated } from '../lib/estimatedHours';
 
 /** 1km 미만은 m 단위로 */
 function formatDistance(km: number): string {
@@ -199,12 +198,8 @@ export function PlaceSearchPanel({ origin, kakaoReady, addedIds, full, onAdd }: 
                 <p className="flex flex-wrap items-center gap-1.5 text-[14px] font-semibold text-navy-900">
                   {r.name}
                   <span className={`chip ${meta.bg}`}>{meta.label}</span>
-                  {isEstimated(r.business) ? (
-                    <span className="chip bg-amber-50 text-amber-700">영업시간 추정</span>
-                  ) : (
-                    !r.business.verified && (
-                      <span className="chip bg-amber-50 text-amber-700">정보 확인 필요</span>
-                    )
+                  {!r.business.verified && (
+                    <span className="chip bg-amber-50 text-amber-700">정보 확인 필요</span>
                   )}
                 </p>
                 <p className="mt-0.5 truncate text-[12px] text-navy-400">{r.address}</p>
@@ -215,9 +210,7 @@ export function PlaceSearchPanel({ origin, kakaoReady, addedIds, full, onAdd }: 
                     </span>
                   )}
                   <span>
-                    영업 {hoursSummary(r.business)}
-                    {isEstimated(r.business) && <span className="text-amber-700"> (추정)</span>} · 기본
-                    체류 {r.defaultStayMinutes}분
+                    영업 {hoursSummary(r.business)} · 기본 체류 {r.defaultStayMinutes}분
                   </span>
                 </p>
               </div>

@@ -128,8 +128,6 @@ export function Timeline({ result, origin, selectedId, onSelect }: Props) {
                   <div className="mt-2 flex flex-wrap gap-1.5">
                     {s.flags.unverified ? (
                       <span className="chip bg-amber-50 text-amber-700">영업정보 확인 필요</span>
-                    ) : s.place.business.source === 'estimated' ? (
-                      <span className="chip bg-amber-50 text-amber-700">추정 영업시간 기준</span>
                     ) : (
                       <span className="chip bg-emerald-50 text-emerald-700">
                         <CheckCircle2 size={11} />
