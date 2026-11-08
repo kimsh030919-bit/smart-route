@@ -50,13 +50,34 @@ export const DEMO_PLACES: PlaceSearchResult[] = [
     isDemo: true,
     business: {
       verified: true,
+      // 기본(평일) 영업시간
       open: '11:00',
       close: '21:00',
       lastOrder: '20:00',
       breaks: [{ start: '15:00', end: '17:00' }],
       closedWeekdays: [1],
+      // 요일별 영업시간: 주말은 더 늦게 열고 일찍 닫으며 브레이크가 짧다
+      weeklyHours: [
+        // 일
+        { closed: false, open: '11:30', close: '20:00', lastOrder: '19:00', breaks: [] },
+        // 월 (정기 휴무)
+        { closed: true, breaks: [] },
+        null, // 화 — 기본값
+        null, // 수
+        null, // 목
+        null, // 금
+        // 토
+        {
+          closed: false,
+          open: '11:30',
+          close: '22:00',
+          lastOrder: '21:00',
+          breaks: [{ start: '15:30', end: '16:30' }],
+        },
+      ],
+      tempClosures: [{ date: '2026-12-25', reason: '크리스마스 휴무 (데모)' }],
       temporarilyClosed: false,
-      note: '데모 데이터 · 브레이크 타임 시연용 (15:00~17:00 휴게)',
+      note: '데모 데이터 · 브레이크 타임/요일별 영업시간 시연용',
       source: 'demo',
     },
   },

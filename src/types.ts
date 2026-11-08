@@ -17,6 +17,26 @@ export interface TimeRange {
   end: string;
 }
 
+/** 특정 요일의 영업 설정 (기본 영업시간을 덮어쓴다) */
+export interface DayHours {
+  /** 이 요일은 휴무 */
+  closed: boolean;
+  /** "HH:MM" */
+  open?: string;
+  /** "HH:MM" */
+  close?: string;
+  /** "HH:MM" */
+  lastOrder?: string;
+  breaks: TimeRange[];
+}
+
+/** 날짜를 지정한 임시 휴무 */
+export interface TempClosure {
+  /** "YYYY-MM-DD" */
+  date: string;
+  reason?: string;
+}
+
 /**
  * 영업정보.
  * verified=false 이면 UI에 "정보 확인 필요"로 표시하고,
@@ -34,7 +54,15 @@ export interface BusinessInfo {
   breaks: TimeRange[];
   /** 정기 휴무일 (0=일 ~ 6=토) */
   closedWeekdays: number[];
-  /** 임시 휴무 */
+  /**
+   * 요일별 영업시간. 길이 7 배열 (0=일 ~ 6=토).
+   * 해당 요일 값이 있으면 기본 영업시간(open/close/lastOrder/breaks)보다 우선한다.
+   * null 이면 그 요일은 기본값을 따른다.
+   */
+  weeklyHours?: (DayHours | null)[];
+  /** 날짜를 지정한 임시 휴무 (예: 12월 25일 휴무) */
+  tempClosures?: TempClosure[];
+  /** 임시 휴무 (오늘/상시 휴업 표시) */
   temporarilyClosed: boolean;
   /** 메모 (예: "매월 첫째 주 월요일 휴무") */
   note?: string;

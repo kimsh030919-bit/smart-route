@@ -404,7 +404,8 @@ export function optimizeSchedule(
       return { name: '첫 장소 주변', address: '출발지 미설정 (장소들의 중심 기준)', lat, lng };
     })();
 
-  const compiledAll = places.map((p) => compileConstraint(p, weekday));
+  // 요일별 영업시간 + 해당 날짜의 임시 휴무까지 반영해 제약을 만든다
+  const compiledAll = places.map((p) => compileConstraint(p, weekday, settings.date));
   const excluded: ExcludedPlace[] = [];
 
   // 날짜만으로 불가능한 장소 (정기휴무/임시휴무 등)는 후보에서 제외

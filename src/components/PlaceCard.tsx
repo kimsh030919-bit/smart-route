@@ -12,7 +12,14 @@ import {
 } from 'lucide-react';
 import type { BusinessInfo, Place, Priority } from '../types';
 import { CATEGORY_META } from '../data/categories';
-import { breaksSummary, closedDaysSummary, hoursSummary } from '../lib/businessHours';
+import {
+  breaksSummary,
+  closedDaysSummary,
+  effectiveHours,
+  hoursSummary,
+  tempClosureOn,
+  tempClosureSummary,
+} from '../lib/businessHours';
 import { PRIORITY_LABELS } from '../lib/optimizer';
 import { WEEKDAY_LABELS, weekdayOf } from '../lib/time';
 import { HoursEditor } from './HoursEditor';
@@ -32,8 +39,10 @@ export function PlaceCard({ place, index, date, onUpdate, onRemove }: Props) {
   const meta = CATEGORY_META[place.category];
   const Icon = meta.icon;
   const weekday = weekdayOf(date);
-  const closedToday =
-    weekday !== null && place.business.verified && place.business.closedWeekdays.includes(weekday);
+  // 요일별 설정까지 반영한 "그날" 기준 상태
+  const eff = weekday !== null ? effectiveHours(place.business, weekday) : null;
+  const closedToday = weekday !== null && place.business.verified && !!eff?.closed;
+  const tempToday = tempClosureOn(place.business, date);
 
   return (
     <div className="rounded-xl border border-navy-100 bg-white p-3.5">
@@ -67,6 +76,17 @@ export function PlaceCard({ place, index, date, onUpdate, onRemove }: Props) {
                 {WEEKDAY_LABELS[weekday!]}요일 휴무
               </span>
             )}
+            {tempToday && (
+              <span className="chip bg-rose-50 text-rose-700">
+                <XCircle size={11} />
+                {tempToday.date} 임시 휴무
+              </span>
+            )}
+            {eff?.fromWeekly && !eff.closed && (
+              <span className="chip bg-brand-50 text-brand-700">
+                {WEEKDAY_LABELS[weekday!]}요일 전용 시간
+              </span>
+            )}
           </div>
 
           <p className="mt-1 flex items-center gap-1 truncate text-[12px] text-navy-400">
@@ -77,14 +97,17 @@ export function PlaceCard({ place, index, date, onUpdate, onRemove }: Props) {
           <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[12px] text-navy-500">
             <span className="flex items-center gap-1">
               <Clock size={12} />
-              영업 {hoursSummary(place.business)}
+              영업 {hoursSummary(place.business, weekday ?? undefined)}
             </span>
             <span className="flex items-center gap-1">
               <Coffee size={12} />
-              브레이크 {breaksSummary(place.business)}
+              브레이크 {breaksSummary(place.business, weekday ?? undefined)}
             </span>
             <span>{closedDaysSummary(place.business)}</span>
-            {place.business.lastOrder && <span>라스트오더 {place.business.lastOrder}</span>}
+            {eff?.lastOrder && <span>라스트오더 {eff.lastOrder}</span>}
+            {(place.business.tempClosures?.length ?? 0) > 0 && (
+              <span>임시 휴무 {tempClosureSummary(place.business)}</span>
+            )}
           </div>
         </div>
 

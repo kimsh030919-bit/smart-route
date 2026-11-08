@@ -1,4 +1,4 @@
-import type { BusinessInfo, ExclusionReason, Place, TimeRange } from '../types';
+import type { BusinessInfo, ExclusionReason, Place, TempClosure, TimeRange } from '../types';
 import { WEEKDAY_LABELS, overlaps, toHHMM, toMinutes } from './time';
 
 export interface MinuteRange {
@@ -6,20 +6,72 @@ export interface MinuteRange {
   end: number;
 }
 
-/** 영업정보가 "확인된" 상태인지 (영업 시작/종료가 모두 있어야 제약으로 사용) */
-export function hasVerifiedHours(info: BusinessInfo): boolean {
-  return info.verified && toMinutes(info.open) !== null && toMinutes(info.close) !== null;
+/**
+ * 해당 요일에 실제로 적용되는 영업 설정.
+ * 요일별 설정(weeklyHours)이 있으면 그것이 기본 영업시간을 덮어쓴다.
+ */
+export interface EffectiveHours {
+  /** 그 요일은 휴무 */
+  closed: boolean;
+  open?: string;
+  close?: string;
+  lastOrder?: string;
+  breaks: TimeRange[];
+  /** 요일별 설정이 적용됐는지 (UI 표시용) */
+  fromWeekly: boolean;
 }
 
-export function breakRanges(info: BusinessInfo): MinuteRange[] {
+export function effectiveHours(info: BusinessInfo, weekday: number): EffectiveHours {
+  const day = info.weeklyHours?.[weekday] ?? null;
+  if (day) {
+    return {
+      closed: day.closed,
+      open: day.open,
+      close: day.close,
+      lastOrder: day.lastOrder,
+      breaks: day.breaks ?? [],
+      fromWeekly: true,
+    };
+  }
+  return {
+    closed: info.closedWeekdays.includes(weekday),
+    open: info.open,
+    close: info.close,
+    lastOrder: info.lastOrder,
+    breaks: info.breaks,
+    fromWeekly: false,
+  };
+}
+
+/** 해당 날짜가 임시 휴무로 등록돼 있는지 */
+export function tempClosureOn(info: BusinessInfo, date?: string): TempClosure | null {
+  if (!date) return null;
+  return info.tempClosures?.find((c) => c.date === date) ?? null;
+}
+
+/** 영업정보가 "확인된" 상태인지 (영업 시작/종료가 모두 있어야 제약으로 사용) */
+export function hasVerifiedHours(info: BusinessInfo, weekday?: number): boolean {
+  if (!info.verified) return false;
+  const eff = weekday === undefined ? null : effectiveHours(info, weekday);
+  const open = eff ? eff.open : info.open;
+  const close = eff ? eff.close : info.close;
+  return toMinutes(open) !== null && toMinutes(close) !== null;
+}
+
+function toRanges(list: TimeRange[]): MinuteRange[] {
   const out: MinuteRange[] = [];
-  for (const b of info.breaks) {
+  for (const b of list) {
     const s = toMinutes(b.start);
     const e = toMinutes(b.end);
     if (s === null || e === null || e <= s) continue;
     out.push({ start: s, end: e });
   }
   return out.sort((a, b) => a.start - b.start);
+}
+
+export function breakRanges(info: BusinessInfo, weekday?: number): MinuteRange[] {
+  const list = weekday === undefined ? info.breaks : effectiveHours(info, weekday).breaks;
+  return toRanges(list ?? []);
 }
 
 /**
@@ -29,15 +81,16 @@ export function breakRanges(info: BusinessInfo): MinuteRange[] {
  */
 export function openWindows(info: BusinessInfo, weekday: number): MinuteRange[] | null {
   if (info.temporarilyClosed) return [];
-  if (info.closedWeekdays.includes(weekday)) return [];
-  if (!hasVerifiedHours(info)) return null;
+  const eff = effectiveHours(info, weekday);
+  if (eff.closed) return [];
+  if (!hasVerifiedHours(info, weekday)) return null;
 
-  const open = toMinutes(info.open)!;
-  const close = toMinutes(info.close)!;
+  const open = toMinutes(eff.open)!;
+  const close = toMinutes(eff.close)!;
   if (close <= open) return [];
 
   let windows: MinuteRange[] = [{ start: open, end: close }];
-  for (const br of breakRanges(info)) {
+  for (const br of breakRanges(info, weekday)) {
     const next: MinuteRange[] = [];
     for (const w of windows) {
       if (!overlaps(w.start, w.end, br.start, br.end)) {
@@ -66,20 +119,35 @@ export interface Compiled {
   staticFail: { reason: ExclusionReason; detail: string } | null;
 }
 
-export function compileConstraint(place: Place, weekday: number): Compiled {
+export function compileConstraint(place: Place, weekday: number, date?: string): Compiled {
   const info = place.business;
   const stay = Math.max(5, place.stayMinutes);
+  const eff = effectiveHours(info, weekday);
   const base: Compiled = {
     place,
     stay,
     windows: null,
-    open: toMinutes(info.open),
-    close: toMinutes(info.close),
-    lastOrder: toMinutes(info.lastOrder),
-    breaks: breakRanges(info),
+    open: toMinutes(eff.open),
+    close: toMinutes(eff.close),
+    lastOrder: toMinutes(eff.lastOrder),
+    breaks: breakRanges(info, weekday),
     staticFail: null,
   };
 
+  // 날짜 지정 임시 휴무가 정기 휴무보다 우선한다
+  const temp = tempClosureOn(info, date);
+  if (temp) {
+    return {
+      ...base,
+      windows: [],
+      staticFail: {
+        reason: 'temporarily_closed',
+        detail: temp.reason
+          ? `${temp.date} 임시 휴무입니다. (${temp.reason})`
+          : `${temp.date} 임시 휴무로 등록된 날짜입니다.`,
+      },
+    };
+  }
   if (info.temporarilyClosed) {
     return {
       ...base,
@@ -87,13 +155,15 @@ export function compileConstraint(place: Place, weekday: number): Compiled {
       staticFail: { reason: 'temporarily_closed', detail: '임시 휴무로 등록된 장소입니다.' },
     };
   }
-  if (info.closedWeekdays.includes(weekday)) {
+  if (eff.closed) {
     return {
       ...base,
       windows: [],
       staticFail: {
         reason: 'closed_weekday',
-        detail: `${WEEKDAY_LABELS[weekday]}요일은 정기 휴무입니다.`,
+        detail: eff.fromWeekly
+          ? `${WEEKDAY_LABELS[weekday]}요일은 휴무로 설정되어 있습니다.`
+          : `${WEEKDAY_LABELS[weekday]}요일은 정기 휴무입니다.`,
       },
     };
   }
@@ -204,30 +274,61 @@ export function slotFor(c: Compiled, arrival: number): SlotResult {
 }
 
 /** 단건 확인용 */
-export function findSlot(place: Place, arrival: number, weekday: number): SlotResult {
-  return slotFor(compileConstraint(place, weekday), arrival);
+export function findSlot(
+  place: Place,
+  arrival: number,
+  weekday: number,
+  date?: string,
+): SlotResult {
+  return slotFor(compileConstraint(place, weekday, date), arrival);
 }
 
 export function formatRange(r: TimeRange): string {
   return `${r.start}~${r.end}`;
 }
 
-export function hoursSummary(info: BusinessInfo): string {
+/**
+ * 영업시간 요약.
+ * weekday 를 주면 그 요일에 실제 적용되는 시간을, 없으면 기본 영업시간을 보여 준다.
+ */
+export function hoursSummary(info: BusinessInfo, weekday?: number): string {
   if (info.temporarilyClosed) return '임시 휴무';
+  if (weekday !== undefined) {
+    const eff = effectiveHours(info, weekday);
+    if (eff.closed) return `${WEEKDAY_LABELS[weekday]}요일 휴무`;
+    if (!hasVerifiedHours(info, weekday)) return '정보 확인 필요';
+    return `${eff.open}~${eff.close}`;
+  }
   if (!hasVerifiedHours(info)) return '정보 확인 필요';
   return `${info.open}~${info.close}`;
 }
 
+/** 요일별 설정까지 반영한 휴무 요일 목록 */
 export function closedDaysSummary(info: BusinessInfo): string {
   if (!info.verified) return '정보 확인 필요';
-  if (info.closedWeekdays.length === 0) return '정기 휴무 없음';
-  return `${info.closedWeekdays.map((d) => WEEKDAY_LABELS[d]).join('·')}요일 휴무`;
+  const closed: number[] = [];
+  for (let d = 0; d < 7; d += 1) {
+    if (effectiveHours(info, d).closed) closed.push(d);
+  }
+  if (closed.length === 0) return '정기 휴무 없음';
+  if (closed.length === 7) return '상시 휴무';
+  return `${closed.map((d) => WEEKDAY_LABELS[d]).join('·')}요일 휴무`;
 }
 
-export function breaksSummary(info: BusinessInfo): string {
+export function breaksSummary(info: BusinessInfo, weekday?: number): string {
   if (!info.verified) return '정보 확인 필요';
-  if (info.breaks.length === 0) return '없음';
-  return info.breaks.map(formatRange).join(', ');
+  const list = weekday === undefined ? info.breaks : effectiveHours(info, weekday).breaks;
+  if (!list || list.length === 0) return '없음';
+  return list.map(formatRange).join(', ');
+}
+
+/** 등록된 임시 휴무 날짜 요약 (가까운 날짜 순, 최대 3개) */
+export function tempClosureSummary(info: BusinessInfo): string {
+  const list = info.tempClosures ?? [];
+  if (list.length === 0) return '없음';
+  const sorted = [...list].sort((a, b) => a.date.localeCompare(b.date));
+  const head = sorted.slice(0, 3).map((c) => c.date).join(', ');
+  return list.length > 3 ? `${head} 외 ${list.length - 3}건` : head;
 }
 
 export const EXCLUSION_LABELS: Record<ExclusionReason, string> = {
