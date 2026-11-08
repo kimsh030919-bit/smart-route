@@ -4,6 +4,7 @@ import {
   ArrowDown,
   ArrowUp,
   CheckCircle2,
+  Globe,
   ListOrdered,
   Loader2,
   RefreshCw,
@@ -26,6 +27,7 @@ import { Footer } from './components/Footer';
 import { useKakaoLoader } from './hooks/useKakaoLoader';
 import { DEMO_ORIGINS, DEMO_PLACES, nextDateForWeekday, type DemoScenario } from './data/demoPlaces';
 import { optimizeSchedule } from './lib/optimizer';
+import { fetchOsmHours } from './lib/osmHours';
 import { loadState, saveState } from './lib/storage';
 import { toMinutes, todayISO } from './lib/time';
 import type { Place, PlaceSearchResult, ScheduleResult, TripSettings } from './types';
@@ -69,9 +71,13 @@ export default function App() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [fixedOrder, setFixedOrder] = useState(false);
   const [stale, setStale] = useState(false);
+  const [osmLoading, setOsmLoading] = useState(false);
+  const [osmNotice, setOsmNotice] = useState<{ ok: boolean; text: string } | null>(null);
 
   const plannerRef = useRef<HTMLDivElement>(null);
   const resultRef = useRef<HTMLDivElement>(null);
+  /** 이미 OpenStreetMap 조회를 시도한 장소 id (같은 장소를 반복 조회하지 않기 위해) */
+  const osmTried = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     saveState({ places, settings });
@@ -112,6 +118,118 @@ export default function App() {
       return next;
     });
   }, []);
+
+  /**
+   * 담은 장소들의 **실제 지도 영업시간**을 OpenStreetMap 에서 가져와 덮어쓴다.
+   * - API 키가 필요 없고 전국(전 세계) 어디든 동작한다.
+   * - OSM 에 영업시간이 등록된 장소만 바꾸고, 없으면 기존 값을 그대로 둔다. (추측하지 않음)
+   * - 사용자가 직접 입력한 영업시간(source: 'user')은 덮어쓰지 않는다.
+   */
+  const loadRealHours = useCallback(async () => {
+    const targets = places
+      .filter((p) => p.business.source !== 'user')
+      .map((p) => ({ id: p.id, name: p.name, lat: p.lat, lng: p.lng }));
+
+    if (targets.length === 0) {
+      setOsmNotice({ ok: false, text: '불러올 장소가 없습니다. (직접 입력한 영업시간은 유지됩니다)' });
+      return;
+    }
+
+    setOsmLoading(true);
+    setOsmNotice(null);
+    targets.forEach((t) => osmTried.current.add(t.id));
+    try {
+      const found = await fetchOsmHours(targets);
+      if (found.size === 0) {
+        setOsmNotice({
+          ok: false,
+          text: `${targets.length}곳 모두 OpenStreetMap에 영업시간이 등록되어 있지 않습니다. 기존 정보를 그대로 둡니다.`,
+        });
+        return;
+      }
+
+      setPlaces((prev) =>
+        prev.map((p) => {
+          const m = found.get(p.id);
+          return m ? { ...p, business: m.business } : p;
+        }),
+      );
+
+      const matches = [...found.values()];
+      const names = matches.map((m) => m.osmName);
+      const loose = matches.filter((m) => m.looseMatch);
+      const missing = targets.length - found.size;
+      setOsmNotice({
+        ok: true,
+        text:
+          `${found.size}곳의 실제 영업시간을 반영했습니다 — ${names.slice(0, 3).join(', ')}` +
+          `${names.length > 3 ? ` 외 ${names.length - 3}곳` : ''}.` +
+          (missing > 0
+            ? ` 나머지 ${missing}곳은 지도에 영업시간이 등록되어 있지 않아 그대로 두었습니다.`
+            : '') +
+          (loose.length > 0
+            ? ` 상호 표기가 달라 부분 일치로 찾은 곳이 있습니다 (${loose
+                .map((m) => m.osmName)
+                .join(', ')}) — 맞는 가게인지 확인해 주세요.`
+            : ''),
+      });
+    } catch (e) {
+      setOsmNotice({
+        ok: false,
+        text: e instanceof Error ? e.message : '영업시간을 불러오지 못했습니다.',
+      });
+    } finally {
+      setOsmLoading(false);
+    }
+  }, [places]);
+
+  /**
+   * 장소를 담으면 **자동으로** 실제 지도 영업시간을 채운다.
+   * 연속으로 담을 때 공개 서버를 두드리지 않도록 잠깐 모았다가 한 번에 조회한다.
+   */
+  useEffect(() => {
+    const fresh = places.filter(
+      (p) =>
+        !osmTried.current.has(p.id) &&
+        p.business.source !== 'user' &&
+        p.business.source !== 'osm' &&
+        !p.isDemo, // 데모 장소는 가상이라 지도에 존재하지 않는다
+    );
+    if (fresh.length === 0) return;
+
+    const timer = window.setTimeout(async () => {
+      fresh.forEach((p) => osmTried.current.add(p.id));
+      try {
+        const found = await fetchOsmHours(
+          fresh.map((p) => ({ id: p.id, name: p.name, lat: p.lat, lng: p.lng })),
+        );
+        if (found.size === 0) return;
+        setPlaces((prev) =>
+          prev.map((p) => {
+            const m = found.get(p.id);
+            // 그 사이 사용자가 직접 입력했다면 덮어쓰지 않는다
+            return m && p.business.source !== 'user' ? { ...p, business: m.business } : p;
+          }),
+        );
+        const matches = [...found.values()];
+        const loose = matches.filter((m) => m.looseMatch);
+        setOsmNotice({
+          ok: true,
+          text:
+            `${matches.map((m) => m.osmName).join(', ')} — 지도에 등록된 실제 영업시간을 자동으로 채웠습니다.` +
+            (loose.length > 0
+              ? ` 상호 표기가 달라 부분 일치로 찾은 곳이 있습니다 (${loose
+                  .map((m) => m.osmName)
+                  .join(', ')}) — 맞는 가게인지 확인해 주세요.`
+              : ''),
+        });
+      } catch {
+        // 자동 조회 실패는 조용히 넘긴다 (버튼으로 다시 시도할 수 있다)
+      }
+    }, 900);
+
+    return () => window.clearTimeout(timer);
+  }, [places]);
 
   const calculate = useCallback(
     (placesOverride?: Place[]) => {
@@ -257,6 +375,22 @@ export default function App() {
                       </span>
                     </h3>
                     <div className="flex items-center gap-1">
+                      {places.length > 0 && (
+                        <button
+                          type="button"
+                          className="btn-ghost text-[12.5px] font-semibold text-brand-700 hover:bg-brand-50 disabled:opacity-50"
+                          onClick={loadRealHours}
+                          disabled={osmLoading}
+                          title="OpenStreetMap에 등록된 실제 영업시간을 가져옵니다 (전국, API 키 불필요)"
+                        >
+                          {osmLoading ? (
+                            <Loader2 size={13} className="animate-spin" />
+                          ) : (
+                            <Globe size={13} />
+                          )}
+                          {osmLoading ? '불러오는 중…' : '실제 영업시간 불러오기'}
+                        </button>
+                      )}
                       <button type="button" className="btn-ghost text-[12.5px]" onClick={quickDemo}>
                         <Sparkles size={13} />
                         데모 장소 불러오기
@@ -276,6 +410,29 @@ export default function App() {
                       )}
                     </div>
                   </div>
+
+                  {osmNotice && (
+                    <p
+                      className={`mt-3 flex items-start gap-2 rounded-xl border px-3.5 py-3 text-[12.5px] leading-relaxed ${
+                        osmNotice.ok
+                          ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+                          : 'border-amber-200 bg-amber-50 text-amber-900'
+                      }`}
+                    >
+                      {osmNotice.ok ? (
+                        <CheckCircle2 size={14} className="mt-0.5 shrink-0" />
+                      ) : (
+                        <AlertCircle size={14} className="mt-0.5 shrink-0" />
+                      )}
+                      <span>
+                        {osmNotice.text}
+                        <span className="mt-0.5 block text-[11.5px] opacity-80">
+                          출처: OpenStreetMap (커뮤니티가 등록한 실제 영업시간). 라스트 오더와 임시
+                          휴무는 제공되지 않아 직접 입력해야 합니다.
+                        </span>
+                      </span>
+                    </p>
+                  )}
 
                   {places.length === 0 ? (
                     <p className="mt-4 rounded-xl border border-dashed border-navy-200 bg-navy-50/60 px-4 py-8 text-center text-[13.5px] leading-relaxed text-navy-500">

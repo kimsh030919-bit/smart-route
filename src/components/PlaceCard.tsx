@@ -6,8 +6,11 @@ import {
   Clock,
   Hourglass,
   MapPin,
+  Minus,
+  Plus,
   Timer,
   Trash2,
+  X,
   XCircle,
 } from 'lucide-react';
 import type { BusinessInfo, Place, Priority } from '../types';
@@ -34,6 +37,25 @@ interface Props {
 }
 
 const STAY_PRESETS = [30, 45, 60, 90, 120];
+
+/** 희망 방문 시간 원터치 프리셋 — 직접 타이핑하지 않아도 되도록 */
+const PREFERRED_PRESETS = [
+  { label: '아침', value: '09:00' },
+  { label: '점심', value: '12:00' },
+  { label: '오후', value: '15:00' },
+  { label: '저녁', value: '18:00' },
+  { label: '밤', value: '20:00' },
+];
+
+/** "HH:MM" 을 delta 분만큼 옮긴다 (00:00~23:55 범위로 고정) */
+function shiftTime(value: string | undefined, delta: number): string | undefined {
+  if (!value) return value;
+  const m = /^(\d{1,2}):(\d{2})$/.exec(value);
+  if (!m) return value;
+  const total = Number(m[1]) * 60 + Number(m[2]) + delta;
+  const clamped = Math.min(23 * 60 + 55, Math.max(0, total));
+  return `${String(Math.floor(clamped / 60)).padStart(2, '0')}:${String(clamped % 60).padStart(2, '0')}`;
+}
 
 export function PlaceCard({ place, index, date, onUpdate, onRemove }: Props) {
   const [open, setOpen] = useState(false);
@@ -214,36 +236,6 @@ export function PlaceCard({ place, index, date, onUpdate, onRemove }: Props) {
         </div>
 
         <div>
-          <span className="mb-1 flex items-center gap-1 text-[11.5px] font-semibold text-navy-500">
-            <Clock size={12} />
-            희망 방문 시간
-          </span>
-          <div className="flex items-center gap-2">
-            <input
-              type="time"
-              step={300}
-              className="input tnum w-[110px] px-2 py-1.5 text-[13px]"
-              value={place.preferredArrival ?? ''}
-              onChange={(e) => onUpdate({ preferredArrival: e.target.value || undefined })}
-            />
-            {place.preferredArrival ? (
-              <button
-                type="button"
-                className="btn-ghost px-2 py-1 text-[12px]"
-                onClick={() => onUpdate({ preferredArrival: undefined })}
-              >
-                해제
-              </button>
-            ) : (
-              <span className="text-[11.5px] text-navy-400">비워 두면 자동 배치</span>
-            )}
-          </div>
-          <p className="mt-1 text-[11px] leading-relaxed text-navy-400">
-            지정하면 그 시각 <strong>이후</strong>에 방문하도록 순서를 맞춥니다.
-          </p>
-        </div>
-
-        <div>
           <span className="mb-1 block text-[11.5px] font-semibold text-navy-500">방문 우선순위</span>
           <div className="flex gap-1.5">
             {(['high', 'normal', 'low'] as Priority[]).map((p) => (
@@ -262,6 +254,91 @@ export function PlaceCard({ place, index, date, onUpdate, onRemove }: Props) {
             ))}
           </div>
         </div>
+        <div className="sm:col-span-2">
+          <span className="mb-1.5 flex items-center gap-1 text-[11.5px] font-semibold text-navy-500">
+            <Clock size={12} />
+            희망 방문 시간
+            <span className="font-normal text-navy-400">— 누르면 바로 지정됩니다</span>
+          </span>
+
+          {/* 자주 쓰는 시간대 원터치 */}
+          <div className="flex flex-wrap gap-1">
+            {PREFERRED_PRESETS.map((p) => (
+              <button
+                key={p.value}
+                type="button"
+                onClick={() =>
+                  onUpdate({
+                    preferredArrival: place.preferredArrival === p.value ? undefined : p.value,
+                  })
+                }
+                className={`rounded-lg border px-2.5 py-1.5 text-[12.5px] font-semibold transition-colors ${
+                  place.preferredArrival === p.value
+                    ? 'border-brand-600 bg-brand-600 text-white'
+                    : 'border-navy-200 text-navy-600 hover:border-brand-300 hover:bg-brand-50'
+                }`}
+              >
+                {p.label}
+                <span className="tnum ml-1 font-normal opacity-70">{p.value}</span>
+              </button>
+            ))}
+          </div>
+
+          {/* 세밀한 조정 */}
+          <div className="mt-2 flex flex-wrap items-center gap-1.5">
+            <button
+              type="button"
+              className="btn px-2 py-1.5 text-[12.5px] font-bold border border-navy-200 text-navy-600 hover:bg-navy-50 disabled:opacity-40"
+              onClick={() => onUpdate({ preferredArrival: shiftTime(place.preferredArrival, -30) })}
+              disabled={!place.preferredArrival}
+              aria-label="희망 시간 30분 당기기"
+            >
+              <Minus size={13} />
+              30분
+            </button>
+            <input
+              type="time"
+              step={300}
+              className="input tnum w-[118px] px-2 py-1.5 text-center text-[14px] font-bold"
+              value={place.preferredArrival ?? ''}
+              onChange={(e) => onUpdate({ preferredArrival: e.target.value || undefined })}
+            />
+            <button
+              type="button"
+              className="btn px-2 py-1.5 text-[12.5px] font-bold border border-navy-200 text-navy-600 hover:bg-navy-50 disabled:opacity-40"
+              onClick={() => onUpdate({ preferredArrival: shiftTime(place.preferredArrival, 30) })}
+              disabled={!place.preferredArrival}
+              aria-label="희망 시간 30분 미루기"
+            >
+              <Plus size={13} />
+              30분
+            </button>
+            {place.preferredArrival ? (
+              <button
+                type="button"
+                className="btn-ghost px-2 py-1.5 text-[12px] text-navy-500"
+                onClick={() => onUpdate({ preferredArrival: undefined })}
+              >
+                <X size={12} />
+                해제
+              </button>
+            ) : (
+              <span className="text-[11.5px] text-navy-400">비워 두면 자동 배치</span>
+            )}
+          </div>
+
+          <p className="mt-1.5 text-[11.5px] leading-relaxed text-navy-400">
+            지정하면 그 시각 <strong>이후</strong>에 도착하도록 순서를 맞춥니다.
+            {deadline !== null && place.preferredArrival && (
+              <>
+                {' '}
+                이 장소는 <strong className="text-navy-600">{formatClock(deadline)}</strong>까지는
+                도착해야 합니다.
+              </>
+            )}
+          </p>
+        </div>
+
       </div>
       )}
 
