@@ -66,7 +66,13 @@ export const CATEGORY_HOURS_ESTIMATE: Partial<Record<Category, CategoryHoursEsti
     closedWeekdays: [],
     basis: '공원·산책로 통상 개방시간 (05:00~23:00)',
   },
-  // etc(업종 미상)는 근거가 없어 추정하지 않는다
+  etc: {
+    open: '10:00',
+    close: '20:00',
+    breaks: [],
+    closedWeekdays: [],
+    basis: '일반 상가 통상 운영시간 (10:00~20:00)',
+  },
 };
 
 /** 영업정보가 비어 있는지 (영업 시작/종료가 없으면 비어 있는 것으로 본다) */

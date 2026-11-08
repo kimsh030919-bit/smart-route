@@ -228,6 +228,7 @@ export default function App() {
               <div className="space-y-6">
                 <TripSettingsCard settings={settings} onChange={setSettings} kakaoReady={kakaoReady} />
                 <PlaceSearchPanel
+                  date={settings.date}
                   origin={settings.origin}
                   kakaoReady={kakaoReady}
                   addedIds={places.map((p) => p.id)}

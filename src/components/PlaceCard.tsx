@@ -5,6 +5,7 @@ import {
   ChevronUp,
   Clock,
   Coffee,
+  Hourglass,
   MapPin,
   Timer,
   Trash2,
@@ -17,11 +18,12 @@ import {
   closedDaysSummary,
   effectiveHours,
   hoursSummary,
+  latestArrival,
   tempClosureOn,
   tempClosureSummary,
 } from '../lib/businessHours';
 import { PRIORITY_LABELS } from '../lib/optimizer';
-import { WEEKDAY_LABELS, weekdayOf } from '../lib/time';
+import { WEEKDAY_LABELS, formatClock, weekdayOf } from '../lib/time';
 import { HoursEditor } from './HoursEditor';
 
 interface Props {
@@ -43,6 +45,11 @@ export function PlaceCard({ place, index, date, onUpdate, onRemove }: Props) {
   const eff = weekday !== null ? effectiveHours(place.business, weekday) : null;
   const closedToday = weekday !== null && place.business.verified && !!eff?.closed;
   const tempToday = tempClosureOn(place.business, date);
+  // 이 장소에 늦어도 몇 시까지 도착해야 하는지
+  const deadline =
+    weekday !== null
+      ? latestArrival(place.business, weekday, place.stayMinutes, date)
+      : null;
 
   return (
     <div className="rounded-xl border border-navy-100 bg-white p-3.5">
@@ -109,6 +116,17 @@ export function PlaceCard({ place, index, date, onUpdate, onRemove }: Props) {
               <span>임시 휴무 {tempClosureSummary(place.business)}</span>
             )}
           </div>
+
+          {/* 이 장소에 늦어도 몇 시까지 도착해야 하는지 */}
+          {deadline !== null && (
+            <p className="mt-1.5 inline-flex items-center gap-1 rounded-lg bg-brand-50 px-2 py-1 text-[12px] font-semibold text-brand-700">
+              <Hourglass size={11} />
+              {formatClock(deadline)}까지 도착
+              <span className="font-normal text-navy-500">
+                ({place.stayMinutes}분 머무는 기준)
+              </span>
+            </p>
+          )}
         </div>
 
         <button

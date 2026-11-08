@@ -322,6 +322,41 @@ export function breaksSummary(info: BusinessInfo, weekday?: number): string {
   return list.map(formatRange).join(', ');
 }
 
+/**
+ * 그 날짜에 "늦어도 몇 시까지 도착해야 하는지" (방문 마감 시각, 분 단위)
+ *
+ * 계산 기준
+ *  - 영업 종료 시각에서 머물 시간을 뺀 시각까지는 도착해야 한다
+ *  - 라스트 오더가 있으면 그보다 늦게 도착할 수 없다
+ *  - 브레이크 타임으로 영업 구간이 나뉘면 마지막 구간을 기준으로 한다
+ *
+ * 영업정보가 없거나 그날 휴무면 null.
+ */
+export function latestArrival(
+  info: BusinessInfo,
+  weekday: number,
+  stayMinutes: number,
+  date?: string,
+): number | null {
+  if (tempClosureOn(info, date)) return null;
+  if (info.temporarilyClosed) return null;
+
+  const windows = openWindows(info, weekday);
+  if (windows === null || windows.length === 0) return null;
+
+  const stay = Math.max(5, stayMinutes);
+  const lastOrder = toMinutes(effectiveHours(info, weekday).lastOrder);
+
+  let best: number | null = null;
+  for (const w of windows) {
+    let limit = w.end - stay;
+    if (lastOrder !== null) limit = Math.min(limit, lastOrder);
+    if (limit < w.start) continue; // 이 구간에서는 체류시간을 못 채운다
+    if (best === null || limit > best) best = limit;
+  }
+  return best;
+}
+
 /** 등록된 임시 휴무 날짜 요약 (가까운 날짜 순, 최대 3개) */
 export function tempClosureSummary(info: BusinessInfo): string {
   const list = info.tempClosures ?? [];

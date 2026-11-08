@@ -1,9 +1,9 @@
 import { ArrowDown, CalendarClock, CheckCircle2, Coffee, Flag, Hourglass, Navigation } from 'lucide-react';
 import type { Origin, ScheduleResult } from '../types';
 import { CATEGORY_META } from '../data/categories';
-import { formatClock, formatDateKo, formatDuration } from '../lib/time';
+import { formatClock, formatDateKo, formatDuration, weekdayOf } from '../lib/time';
 import { MODE_SPECS } from '../lib/travel';
-import { breaksSummary, hoursSummary } from '../lib/businessHours';
+import { breaksSummary, hoursSummary, latestArrival } from '../lib/businessHours';
 
 interface Props {
   result: ScheduleResult;
@@ -123,6 +123,25 @@ export function Timeline({ result, origin, selectedId, onSelect }: Props) {
                         {next ? formatDuration(next.travelFromPrevMinutes) : '일정 종료'}
                       </strong>
                     </span>
+                    {(() => {
+                      const wd = weekdayOf(result.date);
+                      if (wd === null) return null;
+                      const deadline = latestArrival(
+                        s.place.business,
+                        wd,
+                        s.place.stayMinutes,
+                        result.date,
+                      );
+                      if (deadline === null) return null;
+                      const tight = deadline - s.arrival <= 30;
+                      return (
+                        <span className={tight ? 'font-semibold text-rose-600' : ''}>
+                          도착 마감{' '}
+                          <strong className="font-semibold">{formatClock(deadline)}</strong>
+                          {tight && ' (여유 30분 이내)'}
+                        </span>
+                      );
+                    })()}
                   </div>
 
                   <div className="mt-2 flex flex-wrap gap-1.5">

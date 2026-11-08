@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { AlertCircle, Check, Info, Loader2, MapPin, Plus, Search } from 'lucide-react';
+import { AlertCircle, Check, Hourglass, Info, Loader2, MapPin, Plus, Search } from 'lucide-react';
 import type { Origin, PlaceSearchResult } from '../types';
 import { CATEGORY_META } from '../data/categories';
 import {
@@ -10,7 +10,8 @@ import {
   type SearchSource,
 } from '../lib/placeSearch';
 import { searchDemoPlaces } from '../data/demoPlaces';
-import { hoursSummary } from '../lib/businessHours';
+import { breaksSummary, hoursSummary, latestArrival } from '../lib/businessHours';
+import { formatClock, weekdayOf } from '../lib/time';
 
 /** 1km 미만은 m 단위로 */
 function formatDistance(km: number): string {
@@ -18,6 +19,8 @@ function formatDistance(km: number): string {
 }
 
 interface Props {
+  /** 일정 날짜 "YYYY-MM-DD" — 그날 기준 영업시간/도착 마감 계산에 사용 */
+  date: string;
   origin: Origin | null;
   /** 카카오 SDK 로드 상태가 바뀌면 사용 가능한 검색 소스를 다시 계산한다 */
   kakaoReady: boolean;
@@ -26,7 +29,8 @@ interface Props {
   onAdd: (result: PlaceSearchResult) => void;
 }
 
-export function PlaceSearchPanel({ origin, kakaoReady, addedIds, full, onAdd }: Props) {
+export function PlaceSearchPanel({ date, origin, kakaoReady, addedIds, full, onAdd }: Props) {
+  const weekday = weekdayOf(date);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const sources = useMemo(() => availableSearchSources(), [kakaoReady]);
   const [preferred, setPreferred] = useState<SearchSource>(sources[0]);
@@ -210,9 +214,28 @@ export function PlaceSearchPanel({ origin, kakaoReady, addedIds, full, onAdd }: 
                     </span>
                   )}
                   <span>
-                    영업 {hoursSummary(r.business)} · 기본 체류 {r.defaultStayMinutes}분
+                    영업 {hoursSummary(r.business, weekday ?? undefined)}
+                    {r.business.breaks.length > 0 && ` · 브레이크 ${breaksSummary(r.business, weekday ?? undefined)}`}
+                    {' · 체류 '}
+                    {r.defaultStayMinutes}분
                   </span>
                 </p>
+                {(() => {
+                  if (weekday === null) return null;
+                  const deadline = latestArrival(
+                    r.business,
+                    weekday,
+                    r.defaultStayMinutes,
+                    date,
+                  );
+                  if (deadline === null) return null;
+                  return (
+                    <p className="mt-1 inline-flex items-center gap-1 rounded-md bg-brand-50 px-1.5 py-0.5 text-[11.5px] font-semibold text-brand-700">
+                      <Hourglass size={10} />
+                      {formatClock(deadline)}까지 도착
+                    </p>
+                  );
+                })()}
               </div>
               <button
                 type="button"

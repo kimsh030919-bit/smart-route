@@ -98,11 +98,27 @@ export function categoryFromVworld(category: string, name: string): Category {
   ) {
     return 'cafe';
   }
-  if (/음식|식당|맛집|한식|중식|일식|양식|분식|국밥|고기|초밥|파스타|레스토랑/.test(hay)) return 'food';
-  if (/공원|숲|호수|녹지|유원지|수목원/.test(hay)) return 'park';
+  if (
+    /음식|식당|맛집|한식|중식|일식|양식|분식|국밥|고기|초밥|파스타|레스토랑|치킨|피자|버거|주점|호프|술집|포차|바비큐|곱창|국수|냉면|칼국수|김밥/.test(
+      hay,
+    )
+  ) {
+    return 'food';
+  }
+  if (/공원|숲|호수|녹지|유원지|수목원|산책로|둘레길|해수욕장|해변/.test(hay)) return 'park';
   if (/영화|시네마|cgv|메가박스|롯데시네마/i.test(hay)) return 'cinema';
-  if (/백화점|쇼핑|몰|아울렛|시장|마트/.test(hay)) return 'shopping';
-  if (/관광|문화|박물관|미술관|전시|유적|사찰|고궁|명소|전망|체육|경기장/.test(hay)) return 'attraction';
+  if (
+    /백화점|쇼핑|몰|아울렛|시장|마트|편의점|슈퍼|소매|상가|서점|잡화|의류|화장품/.test(hay)
+  ) {
+    return 'shopping';
+  }
+  if (
+    /관광|문화|박물관|미술관|전시|유적|사찰|고궁|명소|전망|체육|경기장|공연|극장|갤러리|기념관|테마파크|식물원|동물원|온천/.test(
+      hay,
+    )
+  ) {
+    return 'attraction';
+  }
   return 'etc';
 }
 
