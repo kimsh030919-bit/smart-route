@@ -4,8 +4,9 @@ import type { Origin, PlaceSearchResult } from '../types';
 import { hasVworldKey, searchVworldOrigins, searchVworldPlaces } from './vworld';
 import { haversineKm } from './travel';
 import { applyEstimates } from './estimatedHours';
+import { hasGoogleKey, searchGooglePlaces } from './googlePlaces';
 
-export type SearchSource = 'kakao' | 'vworld' | 'demo';
+export type SearchSource = 'google' | 'kakao' | 'vworld' | 'demo';
 
 export interface SearchResponse {
   source: SearchSource;
@@ -15,6 +16,7 @@ export interface SearchResponse {
 }
 
 const SOURCE_LABELS: Record<SearchSource, string> = {
+  google: '구글 지도 (영업시간 제공)',
   kakao: '카카오맵 검색',
   vworld: '브이월드 검색',
   demo: '데모 데이터 검색',
@@ -59,6 +61,8 @@ async function searchVworldNearby(
 /** 현재 사용할 수 있는 검색 소스 목록 (우선순위 순) */
 export function availableSearchSources(): SearchSource[] {
   const out: SearchSource[] = [];
+  // 실제 영업시간을 주는 구글을 가장 앞에 둔다
+  if (hasGoogleKey()) out.push('google');
   if (typeof window !== 'undefined' && window.kakao?.maps?.services) out.push('kakao');
   if (hasVworldKey()) out.push('vworld');
   out.push('demo');
@@ -81,6 +85,19 @@ export async function searchPlaces(
   const available = availableSearchSources();
   const source: SearchSource =
     preferred !== 'auto' && available.includes(preferred) ? preferred : available[0];
+
+  if (source === 'google') {
+    const results = await searchGooglePlaces(keyword, origin);
+    const withHours = results.filter((r) => r.business.source === 'google').length;
+    return {
+      source: 'google',
+      results: sortByDistance(results, origin),
+      notice:
+        results.length > 0
+          ? `구글 지도 검색 결과입니다. ${withHours}곳은 구글에 등록된 실제 영업시간(요일별·브레이크 타임 포함)을 그대로 가져왔습니다. 라스트 오더와 임시 휴무는 구글이 제공하지 않아 직접 입력해야 합니다.`
+          : null,
+    };
+  }
 
   if (source === 'demo') {
     return {
@@ -179,10 +196,20 @@ export async function searchOrigin(query: string): Promise<Origin[]> {
   }
 
   if (hasVworldKey()) return searchVworldOrigins(query);
+
+  if (hasGoogleKey()) {
+    const found = await searchGooglePlaces(query).catch(() => []);
+    return found.slice(0, 8).map((p) => ({
+      name: p.name,
+      address: p.address,
+      lat: p.lat,
+      lng: p.lng,
+    }));
+  }
   return [];
 }
 
 /** 주소/지명 검색이 가능한 환경인지 */
 export function canSearchOrigin(kakaoReady: boolean): boolean {
-  return kakaoReady || hasVworldKey();
+  return kakaoReady || hasVworldKey() || hasGoogleKey();
 }
