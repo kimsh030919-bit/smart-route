@@ -3,7 +3,7 @@ import { fetchRoadPath, type RoadPath } from '../lib/roadPath';
 import { Clock, Coffee, Info, Layers, Loader2, MapPin, Route, Timer, X } from 'lucide-react';
 import type { Origin, Stop, TransportMode } from '../types';
 import { KakaoMapView } from './KakaoMapView';
-import { DemoMapView } from './DemoMapView';
+import { SchematicMapView } from './SchematicMapView';
 import { CATEGORY_META } from '../data/categories';
 import { breaksSummary, closedDaysSummary, hoursSummary } from '../lib/businessHours';
 import { formatClock, formatDuration } from '../lib/time';
@@ -15,12 +15,12 @@ const VWorldMapView = lazy(() =>
   import('./VWorldMapView').then((m) => ({ default: m.VWorldMapView })),
 );
 
-export type MapProvider = 'vworld' | 'kakao' | 'demo';
+export type MapProvider = 'vworld' | 'kakao' | 'schematic';
 
 const PROVIDER_LABELS: Record<MapProvider, string> = {
   vworld: '브이월드',
   kakao: '카카오맵',
-  demo: '데모 지도',
+  schematic: '간략 지도',
 };
 
 interface Props {
@@ -48,7 +48,7 @@ export function RouteMap({
     const out: MapProvider[] = [];
     if (hasVworldKey()) out.push('vworld');
     if (kakaoReady) out.push('kakao');
-    out.push('demo');
+    out.push('schematic');
     return out;
   }, [kakaoReady]);
 
@@ -167,7 +167,7 @@ export function RouteMap({
             roadPath={roadPath?.path}
           />
         ) : (
-          <DemoMapView
+          <SchematicMapView
             stops={stops}
             origin={origin}
             selectedId={selectedId}
@@ -251,8 +251,8 @@ export function RouteMap({
       <p className="border-t border-navy-100 px-5 py-3 text-[11.5px] leading-relaxed text-navy-400">
         {active === 'vworld' && '배경지도는 브이월드(국토교통부 공간정보 오픈플랫폼) WMTS 타일입니다. '}
         {active === 'kakao' && '지도는 카카오맵 API로 표시됩니다. '}
-        {active === 'demo' &&
-          '지도 API 키가 없어 데모 지도(좌표 개념도)로 표시합니다. 브이월드 또는 카카오맵 키를 설정하면 실제 지도로 전환됩니다. '}
+        {active === 'schematic' &&
+          '지도 타일 없이 좌표만으로 그린 간략 지도입니다. 실제 지형·도로는 표시되지 않습니다. 브이월드 또는 카카오맵 키를 설정하면 실제 지도로 전환됩니다. '}
         {roadLoading
           ? '도로 경로를 불러오는 중입니다…'
           : roadPath

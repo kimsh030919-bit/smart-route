@@ -9,14 +9,13 @@ export type Priority = 'high' | 'normal' | 'low';
 
 /**
  * 영업정보 출처
- *  - demo      : 내장 데모 데이터
  *  - google    : 구글 지도(Places API)가 제공한 실제 영업시간
  *  - osm       : OpenStreetMap 에 등록된 실제 영업시간 (키 불필요, 커뮤니티 입력)
  *  - user      : 사용자가 직접 입력 (확인된 정보로 취급)
  *  - estimated : 업종 평균으로 채운 추정값 (확인된 정보 아님)
  *  - unknown   : 확인 안 됨
  */
-export type HoursSource = 'demo' | 'google' | 'osm' | 'user' | 'estimated' | 'unknown';
+export type HoursSource = 'google' | 'osm' | 'user' | 'estimated' | 'unknown';
 
 export interface TimeRange {
   /** "HH:MM" */
@@ -93,8 +92,6 @@ export interface Place {
    * 지정하면 이 시각 이후에 도착하도록 일정을 맞춘다. (예: "20:00" → 저녁에 방문)
    */
   preferredArrival?: string;
-  /** 데모 데이터에서 추가된 장소인지 */
-  isDemo?: boolean;
 }
 
 /** 검색 결과 (아직 일정에 추가되지 않은 상태) */
@@ -107,7 +104,6 @@ export interface PlaceSearchResult {
   lng: number;
   defaultStayMinutes: number;
   business: BusinessInfo;
-  isDemo?: boolean;
   /** 출발지로부터의 직선거리(km). 출발지가 설정된 경우에만 채워진다. */
   distanceKm?: number;
 }

@@ -1,6 +1,5 @@
 import type { Category, Place, PlaceSearchResult } from '../types';
 import { CATEGORY_META, categoryFromVworld } from '../data/categories';
-import { DEMO_PLACES } from '../data/demoPlaces';
 import { bboxOfPoints, hasVworldKey, searchVworldPlaces } from './vworld';
 import { haversineKm } from './travel';
 
@@ -38,16 +37,15 @@ export interface Alternative {
 
 /**
  * place 주변 radiusKm 안에서 같은 업종의 대체 장소를 찾는다.
- * 브이월드 키가 있으면 실제 장소를, 없으면 내장 데모 장소를 사용한다.
+ * 브이월드 키가 있어야 동작한다. 키가 없으면 빈 목록을 돌려준다.
  */
 export async function findAlternatives(
   place: Place,
   radiusKm = 2,
   limit = 6,
 ): Promise<Alternative[]> {
-  const found = hasVworldKey()
-    ? await searchNearbyViaVworld(place, radiusKm)
-    : searchNearbyInDemo(place, radiusKm);
+  if (!hasVworldKey()) return [];
+  const found = await searchNearbyViaVworld(place, radiusKm);
 
   return found
     .filter((r) => r.id !== place.id && r.name !== place.name)
@@ -94,12 +92,6 @@ async function searchNearbyViaVworld(
   return out;
 }
 
-function searchNearbyInDemo(place: Place, radiusKm: number): PlaceSearchResult[] {
-  return DEMO_PLACES.filter(
-    (p) => p.category === place.category && haversineKm(place, p) <= radiusKm,
-  );
-}
-
 /** 대체 장소를 일정에 넣을 Place 로 변환 */
 export function alternativeToPlace(alt: Alternative, stayMinutes?: number): Place {
   const r = alt.result;
@@ -113,6 +105,5 @@ export function alternativeToPlace(alt: Alternative, stayMinutes?: number): Plac
     stayMinutes: stayMinutes ?? r.defaultStayMinutes ?? CATEGORY_META[r.category].defaultStay,
     priority: 'normal',
     business: { ...r.business, breaks: r.business.breaks.map((b) => ({ ...b })) },
-    isDemo: r.isDemo,
   };
 }

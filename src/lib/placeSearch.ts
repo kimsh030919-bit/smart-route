@@ -1,12 +1,11 @@
 import { CATEGORY_META, categoryFromKakao } from '../data/categories';
-import { searchDemoPlaces } from '../data/demoPlaces';
 import type { Origin, PlaceSearchResult } from '../types';
 import { hasVworldKey, searchVworldOrigins, searchVworldPlaces } from './vworld';
 import { haversineKm } from './travel';
 import { applyEstimates } from './estimatedHours';
 import { hasGoogleKey, searchGooglePlaces } from './googlePlaces';
 
-export type SearchSource = 'google' | 'kakao' | 'vworld' | 'demo';
+export type SearchSource = 'google' | 'kakao' | 'vworld';
 
 export interface SearchResponse {
   source: SearchSource;
@@ -19,7 +18,6 @@ const SOURCE_LABELS: Record<SearchSource, string> = {
   google: '구글 지도 (영업시간 제공)',
   kakao: '카카오맵 검색',
   vworld: '브이월드 검색',
-  demo: '데모 데이터 검색',
 };
 
 export function sourceLabel(s: SearchSource): string {
@@ -65,7 +63,6 @@ export function availableSearchSources(): SearchSource[] {
   if (hasGoogleKey()) out.push('google');
   if (typeof window !== 'undefined' && window.kakao?.maps?.services) out.push('kakao');
   if (hasVworldKey()) out.push('vworld');
-  out.push('demo');
   return out;
 }
 
@@ -73,9 +70,9 @@ export function availableSearchSources(): SearchSource[] {
  * 장소 검색.
  * - kakao : 카카오맵 키워드 검색 (상호 중심, 영업시간은 제공하지 않음)
  * - vworld: 브이월드 검색 API 2.0 (지명/주소 중심, 영업시간 없음)
- * - demo  : 내장 데모 데이터 (영업시간/휴무/브레이크타임 포함)
  *
- * 어느 쪽이든 외부 API가 영업정보를 주지 않으므로 verified: false("정보 확인 필요")로 담긴다.
+ * 카카오·브이월드는 영업정보를 주지 않으므로 verified: false("정보 확인 필요")로 담기고,
+ * 담은 뒤 OpenStreetMap 에서 실제 영업시간을 자동으로 채운다. (lib/osmHours.ts)
  */
 export async function searchPlaces(
   keyword: string,
@@ -83,6 +80,11 @@ export async function searchPlaces(
   preferred: SearchSource | 'auto' = 'auto',
 ): Promise<SearchResponse> {
   const available = availableSearchSources();
+  if (available.length === 0) {
+    throw new Error(
+      '장소를 검색할 수 있는 지도 API 키가 설정되어 있지 않습니다. .env 에 VITE_VWORLD_API_KEY 또는 VITE_KAKAO_MAP_KEY 를 넣어 주세요.',
+    );
+  }
   const source: SearchSource =
     preferred !== 'auto' && available.includes(preferred) ? preferred : available[0];
 
@@ -96,14 +98,6 @@ export async function searchPlaces(
         results.length > 0
           ? `구글 지도 검색 결과입니다. ${withHours}곳은 구글에 등록된 실제 영업시간(요일별·브레이크 타임 포함)을 그대로 가져왔습니다. 라스트 오더와 임시 휴무는 구글이 제공하지 않아 직접 입력해야 합니다.`
           : null,
-    };
-  }
-
-  if (source === 'demo') {
-    return {
-      source: 'demo',
-      results: sortByDistance(searchDemoPlaces(keyword), origin),
-      notice: null,
     };
   }
 

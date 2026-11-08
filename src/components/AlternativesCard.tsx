@@ -99,7 +99,7 @@ export function AlternativesCard({ excluded, onReplace }: Props) {
               {!loading && alts.length === 0 ? (
                 <p className="mt-2 text-[12.5px] leading-relaxed text-navy-500">
                   주변 2km 안에서 같은 업종의 대체 장소를 찾지 못했습니다.
-                  {!hasVworldKey() && ' (지도 API 키가 없어 데모 장소에서만 찾았습니다)'}
+                  {!hasVworldKey() && ' (브이월드 키가 없어 주변 장소를 검색할 수 없습니다)'}
                 </p>
               ) : (
                 <ul className="mt-2 space-y-2">

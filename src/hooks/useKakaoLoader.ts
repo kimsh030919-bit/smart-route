@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 
-export type KakaoStatus = 'demo' | 'loading' | 'ready' | 'error';
+export type KakaoStatus = 'nokey' | 'loading' | 'ready' | 'error';
 
 const SCRIPT_ID = 'kakao-maps-sdk';
 
@@ -47,10 +47,10 @@ function loadSdk(): Promise<void> {
 
 /**
  * 카카오맵 SDK 로더.
- * 키가 없으면 'demo' 상태로 두고, 앱은 데모 지도/데모 검색으로 동작한다.
+ * 키가 없으면 'nokey' 상태로 두고, 브이월드 지도/검색으로 동작한다.
  */
 export function useKakaoLoader(): { status: KakaoStatus; error: string | null } {
-  const [status, setStatus] = useState<KakaoStatus>(KAKAO_APP_KEY ? 'loading' : 'demo');
+  const [status, setStatus] = useState<KakaoStatus>(KAKAO_APP_KEY ? 'loading' : 'nokey');
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {

@@ -25,7 +25,6 @@ import { WarningPanel } from './components/WarningPanel';
 import { AlternativesCard } from './components/AlternativesCard';
 import { Footer } from './components/Footer';
 import { useKakaoLoader } from './hooks/useKakaoLoader';
-import { DEMO_ORIGINS, DEMO_PLACES, nextDateForWeekday, type DemoScenario } from './data/demoPlaces';
 import { optimizeSchedule } from './lib/optimizer';
 import { fetchOsmHours } from './lib/osmHours';
 import { loadState, saveState } from './lib/storage';
@@ -40,7 +39,7 @@ const DEFAULT_SETTINGS: TripSettings = {
   startTime: '11:00',
   endTime: '21:00',
   mode: 'transit',
-  origin: DEMO_ORIGINS[0],
+  origin: null,
 };
 
 function toPlace(r: PlaceSearchResult): Place {
@@ -54,7 +53,6 @@ function toPlace(r: PlaceSearchResult): Place {
     stayMinutes: r.defaultStayMinutes,
     priority: 'normal',
     business: { ...r.business, breaks: r.business.breaks.map((b) => ({ ...b })) },
-    isDemo: r.isDemo,
   };
 }
 
@@ -73,6 +71,8 @@ export default function App() {
   const [stale, setStale] = useState(false);
   const [osmLoading, setOsmLoading] = useState(false);
   const [osmNotice, setOsmNotice] = useState<{ ok: boolean; text: string } | null>(null);
+  /** 실패한 자동 조회를 다시 돌리기 위한 신호 */
+  const [osmRetry, setOsmRetry] = useState(0);
 
   const plannerRef = useRef<HTMLDivElement>(null);
   const resultRef = useRef<HTMLDivElement>(null);
@@ -192,12 +192,12 @@ export default function App() {
       (p) =>
         !osmTried.current.has(p.id) &&
         p.business.source !== 'user' &&
-        p.business.source !== 'osm' &&
-        !p.isDemo, // 데모 장소는 가상이라 지도에 존재하지 않는다
+        p.business.source !== 'osm',
     );
     if (fresh.length === 0) return;
 
     const timer = window.setTimeout(async () => {
+      // 먼저 표시해 두어 같은 장소로 반복 호출되지 않게 한다
       fresh.forEach((p) => osmTried.current.add(p.id));
       try {
         const found = await fetchOsmHours(
@@ -223,13 +223,26 @@ export default function App() {
                   .join(', ')}) — 맞는 가게인지 확인해 주세요.`
               : ''),
         });
-      } catch {
-        // 자동 조회 실패는 조용히 넘긴다 (버튼으로 다시 시도할 수 있다)
+      } catch (e) {
+        // 공개 Overpass 서버는 간헐적으로 혼잡(429)하다.
+        // 조용히 넘기면 영업시간이 채워지지 않은 이유를 알 수 없으므로,
+        // 실패를 알리고 잠시 뒤 **자동으로 한 번 더** 시도한다.
+        setOsmNotice({
+          ok: false,
+          text: `${
+            e instanceof Error ? e.message : '영업시간을 불러오지 못했습니다.'
+          } 잠시 후 자동으로 다시 시도합니다. (바로 시도하려면 "실제 영업시간 불러오기"를 누르세요)`,
+        });
+        window.setTimeout(() => {
+          fresh.forEach((p) => osmTried.current.delete(p.id));
+          setOsmRetry((n) => n + 1);
+        }, 12000);
       }
     }, 900);
 
     return () => window.clearTimeout(timer);
-  }, [places]);
+    // osmRetry 가 바뀌면 실패했던 장소를 다시 조회한다
+  }, [places, osmRetry]);
 
   const calculate = useCallback(
     (placesOverride?: Place[]) => {
@@ -295,39 +308,6 @@ export default function App() {
     [places, calculate],
   );
 
-  const applyScenario = useCallback((s: DemoScenario) => {
-    const picked = s.placeIds
-      .map((id) => DEMO_PLACES.find((p) => p.id === id))
-      .filter((p): p is PlaceSearchResult => !!p)
-      .map(toPlace);
-    setPlaces(picked);
-    setSettings({
-      date: nextDateForWeekday(s.weekday),
-      startTime: s.startTime,
-      endTime: s.endTime,
-      mode: s.mode,
-      origin: DEMO_ORIGINS[s.originIndex] ?? DEMO_ORIGINS[0],
-    });
-    setFixedOrder(false);
-    setResult(null);
-    setError(null);
-    setTimeout(() => scrollTo(plannerRef), 50);
-  }, []);
-
-  const quickDemo = useCallback(() => {
-    applyScenario({
-      id: 'breaktime',
-      title: '',
-      description: '',
-      placeIds: ['demo-cafe-a', 'demo-food-b', 'demo-attraction-c', 'demo-park-e'],
-      originIndex: 0,
-      startTime: '11:00',
-      endTime: '21:00',
-      mode: 'transit',
-      weekday: 6,
-    });
-  }, [applyScenario]);
-
   return (
     <div className="min-h-screen bg-white">
       <Header kakaoStatus={kakaoStatus} onStart={() => scrollTo(plannerRef)} />
@@ -347,7 +327,7 @@ export default function App() {
             {kakaoStatus === 'error' && kakaoError && (
               <p className="mt-5 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-[13px] leading-relaxed text-amber-900">
                 <AlertCircle size={15} className="mt-0.5 shrink-0" />
-                {kakaoError} 지금은 데모 지도와 데모 장소 데이터로 모든 기능을 사용할 수 있습니다.
+                {kakaoError} 브이월드 지도와 검색으로 모든 기능을 그대로 사용할 수 있습니다.
               </p>
             )}
 
@@ -391,10 +371,6 @@ export default function App() {
                           {osmLoading ? '불러오는 중…' : '실제 영업시간 불러오기'}
                         </button>
                       )}
-                      <button type="button" className="btn-ghost text-[12.5px]" onClick={quickDemo}>
-                        <Sparkles size={13} />
-                        데모 장소 불러오기
-                      </button>
                       {places.length > 0 && (
                         <button
                           type="button"

@@ -9,7 +9,6 @@ import {
   sourceLabel,
   type SearchSource,
 } from '../lib/placeSearch';
-import { searchDemoPlaces } from '../data/demoPlaces';
 import { breaksSummary, hoursSummary, latestArrival } from '../lib/businessHours';
 import { formatClock, weekdayOf } from '../lib/time';
 
@@ -33,7 +32,8 @@ export function PlaceSearchPanel({ date, origin, kakaoReady, addedIds, full, onA
   const weekday = weekdayOf(date);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const sources = useMemo(() => availableSearchSources(), [kakaoReady]);
-  const [preferred, setPreferred] = useState<SearchSource>(sources[0]);
+  const noSource = sources.length === 0;
+  const [preferred, setPreferred] = useState<SearchSource>(sources[0] ?? 'vworld');
 
   // 사용 가능한 소스가 바뀌어 현재 선택이 유효하지 않으면 첫 번째 소스로 맞춘다
   useEffect(() => {
@@ -46,25 +46,21 @@ export function PlaceSearchPanel({ date, origin, kakaoReady, addedIds, full, onA
     setResults((prev) => sortByDistance(prev, origin));
   }, [origin]);
   const [keyword, setKeyword] = useState('');
-  const [results, setResults] = useState<PlaceSearchResult[]>(() =>
-    sortByDistance(searchDemoPlaces(''), origin),
-  );
-  const [source, setSource] = useState<SearchSource>('demo');
+  const [results, setResults] = useState<PlaceSearchResult[]>([]);
+  const [source, setSource] = useState<SearchSource | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  const onlyDemo = sources.length === 1 && sources[0] === 'demo';
 
   async function run(e?: React.FormEvent, overrideSource?: SearchSource) {
     e?.preventDefault();
     const use = overrideSource ?? preferred;
     const q = keyword.trim();
     if (!q) {
-      setResults(sortByDistance(searchDemoPlaces(''), origin));
-      setSource('demo');
+      setResults([]);
+      setSource(null);
       setNotice(null);
-      setError(null);
+      setError('검색어를 입력해 주세요.');
       return;
     }
     setLoading(true);
@@ -75,17 +71,12 @@ export function PlaceSearchPanel({ date, origin, kakaoReady, addedIds, full, onA
       setSource(res.source);
       setNotice(res.notice);
       if (res.results.length === 0) {
-        setError(
-          res.source === 'demo'
-            ? '데모 데이터에 해당하는 장소가 없습니다. 키워드를 비우면 전체 데모 장소를 볼 수 있어요.'
-            : '검색 결과가 없습니다. 다른 키워드로 시도해 보세요.',
-        );
+        setError('검색 결과가 없습니다. 다른 키워드로 시도해 보세요.');
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : '검색 중 오류가 발생했습니다.');
-      // 실패 시 데모 데이터로 폴백 (시연이 끊기지 않도록)
-      setResults(sortByDistance(searchDemoPlaces(q), origin));
-      setSource('demo');
+      setResults([]);
+      setSource(null);
     } finally {
       setLoading(false);
     }
@@ -107,13 +98,9 @@ export function PlaceSearchPanel({ date, origin, kakaoReady, addedIds, full, onA
           ) : (
             <span className="chip bg-navy-100 text-navy-600">출발지 미설정 · 관련도순</span>
           )}
-          <span
-            className={`chip ${
-              source === 'demo' ? 'bg-amber-50 text-amber-700' : 'bg-emerald-50 text-emerald-700'
-            }`}
-          >
-            {sourceLabel(source)} 결과
-          </span>
+          {source && (
+            <span className="chip bg-emerald-50 text-emerald-700">{sourceLabel(source)} 결과</span>
+          )}
         </div>
       </div>
 
@@ -143,26 +130,29 @@ export function PlaceSearchPanel({ date, origin, kakaoReady, addedIds, full, onA
         <input
           className="input"
           placeholder={
-            preferred === 'demo'
-              ? '데모 장소 검색 (예: 카페, 음식점, 공원)'
-              : preferred === 'vworld'
-                ? '지명·주소 검색 (예: 서울숲, 성수동)'
-                : '장소 이름 검색 (예: 성수 카페, 서울숲)'
+            preferred === 'vworld'
+              ? '지명·주소 검색 (예: 서울숲, 성수동)'
+              : '장소 이름 검색 (예: 성수 카페, 서울숲)'
           }
           value={keyword}
           onChange={(e) => setKeyword(e.target.value)}
         />
-        <button type="submit" className="btn-primary shrink-0 px-4 py-2.5" disabled={loading}>
+        <button
+          type="submit"
+          className="btn-primary shrink-0 px-4 py-2.5"
+          disabled={loading || noSource}
+        >
           {loading ? <Loader2 size={16} className="animate-spin" /> : <Search size={16} />}
           검색
         </button>
       </form>
 
-      {onlyDemo && (
+      {noSource && (
         <p className="mt-3 flex items-start gap-1.5 rounded-xl bg-amber-50 px-3 py-2.5 text-[12.5px] leading-relaxed text-amber-800">
           <Info size={14} className="mt-0.5 shrink-0" />
-          지도 API 키가 없어 <strong>데모 데이터</strong>로 검색합니다. 데모 장소는 영업시간·휴무·브레이크
-          타임이 미리 설정되어 있어 모든 기능을 그대로 시연할 수 있습니다.
+          장소를 검색할 수 있는 지도 API 키가 설정되어 있지 않습니다. <code>.env</code> 에
+          <strong> VITE_VWORLD_API_KEY</strong> 또는 <strong>VITE_KAKAO_MAP_KEY</strong> 를 넣어
+          주세요.
         </p>
       )}
 
@@ -186,7 +176,15 @@ export function PlaceSearchPanel({ date, origin, kakaoReady, addedIds, full, onA
         </p>
       )}
 
-      <ul className="scroll-thin mt-4 max-h-[22rem] divide-y divide-navy-100 overflow-y-auto rounded-xl border border-navy-100">
+      {results.length === 0 && !loading && !error && !noSource && (
+        <p className="mt-4 rounded-xl border border-dashed border-navy-200 bg-navy-50/60 px-4 py-8 text-center text-[13px] leading-relaxed text-navy-500">
+          가고 싶은 장소를 검색해 주세요.
+          <br />
+          담으면 지도에 등록된 실제 영업시간을 자동으로 찾아 채웁니다.
+        </p>
+      )}
+
+      <ul className="scroll-thin mt-4 max-h-[22rem] divide-y divide-navy-100 overflow-y-auto rounded-xl border border-navy-100 empty:hidden empty:border-0">
         {results.map((r) => {
           const meta = CATEGORY_META[r.category];
           const Icon = meta.icon;

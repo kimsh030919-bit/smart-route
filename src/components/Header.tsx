@@ -8,16 +8,16 @@ interface Props {
 }
 
 const STATUS_TEXT: Record<KakaoStatus, { label: string; cls: string }> = {
-  demo: { label: '데모 모드 (지도 API 키 없음)', cls: 'bg-amber-50 text-amber-700' },
+  nokey: { label: '지도 API 키 없음', cls: 'bg-amber-50 text-amber-700' },
   loading: { label: '카카오맵 불러오는 중', cls: 'bg-navy-50 text-navy-600' },
   ready: { label: '카카오맵 연결됨', cls: 'bg-emerald-50 text-emerald-700' },
-  error: { label: '지도 연결 실패 · 데모 모드', cls: 'bg-rose-50 text-rose-700' },
+  error: { label: '카카오맵 연결 실패', cls: 'bg-rose-50 text-rose-700' },
 };
 
 export function Header({ kakaoStatus, onStart }: Props) {
   // 카카오 상태는 "연결됨 / 오류"일 때만 노출한다.
   // (브이월드만 쓰는 경우 "카카오맵 키 없음" 배지는 불필요한 노이즈)
-  // 지도 키가 하나도 없을 때는 데모 모드임을 반드시 알린다.
+  // 지도 키가 하나도 없을 때는 반드시 알린다.
   const showKakaoStatus =
     kakaoStatus === 'ready' || kakaoStatus === 'error' || !hasVworldKey();
   const status = STATUS_TEXT[kakaoStatus];

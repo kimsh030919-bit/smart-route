@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react';
-import { Calendar, Check, Clock, Flag, MapPin, Navigation, Search, X } from 'lucide-react';
+import { Calendar, Check, Clock, Flag, Navigation, Search, X } from 'lucide-react';
 import type { Origin, TransportMode, TripSettings } from '../types';
 import { MODE_LIST } from '../lib/travel';
-import { DEMO_ORIGINS } from '../data/demoPlaces';
 import { canSearchOrigin, searchOrigin } from '../lib/placeSearch';
 import { formatDateKo } from '../lib/time';
 
@@ -23,7 +22,7 @@ export function TripSettingsCard({ settings, onChange, kakaoReady }: Props) {
   // 입력칸에 현재 출발지가 그대로 보이는지 (= 적용된 상태인지)
   const isOriginSet = !!settings.origin && query.trim() === settings.origin.name;
 
-  // 데모 출발지 선택·복원 등으로 출발지가 바뀌면 입력칸도 따라 바뀐다
+  // 저장된 출발지 복원 등으로 출발지가 바뀌면 입력칸도 따라 바뀐다
   useEffect(() => {
     const name = settings.origin?.name ?? '';
     setQuery((q) => (q === name ? q : name));
@@ -34,7 +33,7 @@ export function TripSettingsCard({ settings, onChange, kakaoReady }: Props) {
     if (!query.trim()) return;
     if (!searchable) {
       setError(
-        '지도 API 키(카카오맵 또는 브이월드)가 없어 주소 검색을 사용할 수 없습니다. 아래 데모 출발지를 선택해 주세요.',
+        '지도 API 키(카카오맵 또는 브이월드)가 없어 주소 검색을 사용할 수 없습니다. .env 에 VITE_VWORLD_API_KEY 또는 VITE_KAKAO_MAP_KEY 를 넣어 주세요.',
       );
       return;
     }
@@ -76,7 +75,7 @@ export function TripSettingsCard({ settings, onChange, kakaoReady }: Props) {
                   ? 'border-emerald-300 bg-emerald-50/40 focus:border-emerald-500 focus:ring-emerald-500/10'
                   : ''
               }`}
-              placeholder={searchable ? '예) 성수역, 홍대입구역, 강남역' : '데모 모드에서는 아래 목록에서 선택'}
+              placeholder={searchable ? '예) 성수역, 홍대입구역, 강남역' : '지도 API 키가 필요합니다'}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
             />
@@ -117,23 +116,6 @@ export function TripSettingsCard({ settings, onChange, kakaoReady }: Props) {
             </p>
           ))}
 
-        <div className="mt-2 flex flex-wrap gap-1.5">
-          {DEMO_ORIGINS.map((o) => (
-            <button
-              key={o.name}
-              type="button"
-              onClick={() => patch({ origin: o })}
-              className={`chip border transition-colors ${
-                settings.origin?.name === o.name
-                  ? 'border-brand-600 bg-brand-50 text-brand-700'
-                  : 'border-navy-200 bg-white text-navy-600 hover:bg-navy-50'
-              }`}
-            >
-              <MapPin size={12} />
-              {o.name}
-            </button>
-          ))}
-        </div>
 
         {candidates && candidates.length > 0 && (
           <ul className="mt-2 divide-y divide-navy-100 overflow-hidden rounded-xl border border-navy-200">

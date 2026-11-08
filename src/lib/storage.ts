@@ -3,6 +3,9 @@ import { todayISO } from './time';
 
 const KEY = 'smart-route:v1';
 
+/** 더 이상 쓰지 않는 예전 저장소 (삭제된 기능이 남긴 것) */
+const OBSOLETE_KEYS = ['smart-route:stores:v1'];
+
 export interface PersistedState {
   places: Place[];
   settings: TripSettings;
@@ -34,6 +37,7 @@ function normalizeSettings(s: TripSettings): TripSettings {
 
 export function loadState(): PersistedState | null {
   try {
+    for (const k of OBSOLETE_KEYS) localStorage.removeItem(k);
     const raw = localStorage.getItem(KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as PersistedState;
@@ -47,8 +51,14 @@ export function loadState(): PersistedState | null {
         typeof p?.name === 'string' &&
         Number.isFinite(p?.lat) &&
         Number.isFinite(p?.lng) &&
-        !!p?.business,
+        !!p?.business &&
+        // 예전 버전에서 저장된 가상의 데모 장소는 버린다
+        !p.id.startsWith('demo-'),
     );
+    // 예전 버전의 데모 출발지도 버린다
+    if (parsed.settings.origin && /\(데모\)/.test(parsed.settings.origin.name)) {
+      parsed.settings.origin = null;
+    }
     return parsed;
   } catch {
     return null;

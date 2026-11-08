@@ -23,7 +23,7 @@ function toPlane(lat: number, lng: number) {
  * 지도 API 키가 없을 때 사용하는 데모 지도.
  * 실제 지도 타일이 아니라 좌표를 평면에 투영한 개념도이며, 화면에도 그렇게 표시한다.
  */
-export function DemoMapView({ stops, origin, selectedId, onSelect, roadPath }: Props) {
+export function SchematicMapView({ stops, origin, selectedId, onSelect, roadPath }: Props) {
   const nodes = [
     ...(origin ? [{ id: '__origin__', lat: origin.lat, lng: origin.lng }] : []),
     ...stops.map((s) => ({ id: s.place.id, lat: s.place.lat, lng: s.place.lng })),
