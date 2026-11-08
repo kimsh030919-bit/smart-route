@@ -12,6 +12,7 @@ import {
   Wand2,
 } from 'lucide-react';
 import { Header } from './components/Header';
+import { HeroImage } from './components/HeroImage';
 import { TripSettingsCard } from './components/TripSettingsCard';
 import { PlaceSearchPanel } from './components/PlaceSearchPanel';
 import { PlaceCard } from './components/PlaceCard';
@@ -204,6 +205,8 @@ export default function App() {
     <div className="min-h-screen bg-white">
       <Header kakaoStatus={kakaoStatus} onStart={() => scrollTo(plannerRef)} />
       <main>
+        <HeroImage />
+
         <section ref={plannerRef} id="planner" className="scroll-mt-20 bg-white">
           <div className="mx-auto max-w-6xl px-4 py-14 sm:px-6">
             <h2 className="text-[26px] font-extrabold tracking-tight text-navy-900 sm:text-[30px]">
