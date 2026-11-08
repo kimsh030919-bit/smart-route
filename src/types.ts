@@ -86,6 +86,11 @@ export interface Place {
   stayMinutes: number;
   priority: Priority;
   business: BusinessInfo;
+  /**
+   * 희망 방문 시간 "HH:MM".
+   * 지정하면 이 시각 이후에 도착하도록 일정을 맞춘다. (예: "20:00" → 저녁에 방문)
+   */
+  preferredArrival?: string;
   /** 데모 데이터에서 추가된 장소인지 */
   isDemo?: boolean;
 }
@@ -132,6 +137,7 @@ export type ExclusionReason =
   | 'stay_too_long'
   | 'after_last_order'
   | 'over_end_time'
+  | 'preferred_time'
   | 'unreachable';
 
 export interface ExcludedPlace {

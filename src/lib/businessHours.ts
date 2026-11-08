@@ -115,6 +115,8 @@ export interface Compiled {
   close: number | null;
   lastOrder: number | null;
   breaks: MinuteRange[];
+  /** 희망 방문 시간(분). 이 시각 전에는 방문하지 않는다. */
+  earliest: number | null;
   /** 날짜만으로 이미 방문 불가인 경우 */
   staticFail: { reason: ExclusionReason; detail: string } | null;
 }
@@ -131,6 +133,7 @@ export function compileConstraint(place: Place, weekday: number, date?: string):
     close: toMinutes(eff.close),
     lastOrder: toMinutes(eff.lastOrder),
     breaks: breakRanges(info, weekday),
+    earliest: toMinutes(place.preferredArrival),
     staticFail: null,
   };
 
@@ -197,8 +200,12 @@ export interface SlotResult {
   start?: number;
   end?: number;
   waitMinutes?: number;
+  /** 희망 방문 시간을 맞추려고 기다린 시간(분) — 의도한 대기라 비용에서 제외한다 */
+  preferredWaitMinutes?: number;
   breakAvoided?: boolean;
   waitedForOpen?: boolean;
+  /** 희망 방문 시간에 맞춰 배치됐는지 */
+  matchedPreferred?: boolean;
   nearLastOrder?: boolean;
   nearClose?: boolean;
   reason?: ExclusionReason;
@@ -214,14 +221,20 @@ export interface SlotResult {
 export function slotFor(c: Compiled, arrival: number): SlotResult {
   if (c.staticFail) return { ok: false, ...c.staticFail };
 
-  // 영업정보 미확인 -> 시간 제약 없이 배치
+  // 희망 방문 시간이 있으면 그 시각 전에는 방문하지 않는다
+  const earliest = c.earliest;
+  const floor = earliest !== null ? Math.max(arrival, earliest) : arrival;
+
+  // 영업정보 미확인 -> 시간 제약 없이 배치 (희망 시간만 지킨다)
   if (c.windows === null) {
     return {
       ok: true,
-      start: arrival,
-      end: arrival + c.stay,
-      waitMinutes: 0,
+      start: floor,
+      end: floor + c.stay,
+      waitMinutes: floor - arrival,
+      preferredWaitMinutes: floor - arrival,
       waitedForOpen: false,
+      matchedPreferred: earliest !== null,
       breakAvoided: false,
       nearLastOrder: false,
       nearClose: false,
@@ -229,7 +242,7 @@ export function slotFor(c: Compiled, arrival: number): SlotResult {
   }
 
   for (const w of c.windows) {
-    const start = Math.max(arrival, w.start);
+    const start = Math.max(floor, w.start);
     if (start + c.stay > w.end) continue;
     if (c.lastOrder !== null && start > c.lastOrder) {
       return {
@@ -244,10 +257,23 @@ export function slotFor(c: Compiled, arrival: number): SlotResult {
       start,
       end,
       waitMinutes: start - arrival,
+      // 희망 시간을 기다린 몫은 "낭비된 대기"가 아니므로 따로 센다
+      preferredWaitMinutes:
+        earliest !== null ? Math.max(0, Math.min(start, earliest) - arrival) : 0,
       waitedForOpen: c.open !== null && arrival < c.open,
+      matchedPreferred: earliest !== null,
       breakAvoided: c.breaks.some((b) => arrival < b.end && start >= b.end),
       nearLastOrder: c.lastOrder !== null && c.lastOrder - start <= 30,
       nearClose: c.close !== null && c.close - end <= 30,
+    };
+  }
+
+  // 희망 시간 때문에 못 들어가는 경우를 먼저 구분해 안내한다
+  if (earliest !== null && c.close !== null && earliest + c.stay > c.close) {
+    return {
+      ok: false,
+      reason: 'preferred_time',
+      detail: `희망 방문 시간 ${toHHMM(earliest)}부터는 체류시간 ${c.stay}분을 확보할 수 없습니다. (영업 종료 ${toHHMM(c.close)})`,
     };
   }
 
@@ -374,5 +400,6 @@ export const EXCLUSION_LABELS: Record<ExclusionReason, string> = {
   stay_too_long: '체류시간 확보 불가',
   after_last_order: '라스트 오더 경과',
   over_end_time: '희망 종료 시간 초과',
+  preferred_time: '희망 방문 시간대 불가',
   unreachable: '동선 구성 불가',
 };

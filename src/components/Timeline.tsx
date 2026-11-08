@@ -165,6 +165,11 @@ export function Timeline({ result, origin, selectedId, onSelect }: Props) {
                           브레이크 타임 충돌 없음
                         </span>
                       ))}
+                    {s.place.preferredArrival && (
+                      <span className="chip bg-brand-600 text-white">
+                        희망 {s.place.preferredArrival} 이후 방문 반영
+                      </span>
+                    )}
                     {s.flags.waitedForOpen && s.waitMinutes > 0 && (
                       <span className="chip bg-amber-50 text-amber-700">
                         오픈 대기 {formatDuration(s.waitMinutes)}

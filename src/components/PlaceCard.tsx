@@ -94,6 +94,12 @@ export function PlaceCard({ place, index, date, onUpdate, onRemove }: Props) {
                 {WEEKDAY_LABELS[weekday!]}요일 전용 시간
               </span>
             )}
+            {place.preferredArrival && (
+              <span className="chip bg-brand-600 text-white">
+                <Clock size={11} />
+                {place.preferredArrival} 이후 방문
+              </span>
+            )}
           </div>
 
           <p className="mt-1 flex items-center gap-1 truncate text-[12px] text-navy-400">
@@ -177,6 +183,36 @@ export function PlaceCard({ place, index, date, onUpdate, onRemove }: Props) {
               ))}
             </div>
           </div>
+        </div>
+
+        <div>
+          <span className="mb-1 flex items-center gap-1 text-[11.5px] font-semibold text-navy-500">
+            <Clock size={12} />
+            희망 방문 시간
+          </span>
+          <div className="flex items-center gap-2">
+            <input
+              type="time"
+              step={300}
+              className="input tnum w-[110px] px-2 py-1.5 text-[13px]"
+              value={place.preferredArrival ?? ''}
+              onChange={(e) => onUpdate({ preferredArrival: e.target.value || undefined })}
+            />
+            {place.preferredArrival ? (
+              <button
+                type="button"
+                className="btn-ghost px-2 py-1 text-[12px]"
+                onClick={() => onUpdate({ preferredArrival: undefined })}
+              >
+                해제
+              </button>
+            ) : (
+              <span className="text-[11.5px] text-navy-400">비워 두면 자동 배치</span>
+            )}
+          </div>
+          <p className="mt-1 text-[11px] leading-relaxed text-navy-400">
+            지정하면 그 시각 <strong>이후</strong>에 방문하도록 순서를 맞춥니다.
+          </p>
         </div>
 
         <div>

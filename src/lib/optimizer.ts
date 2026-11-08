@@ -170,18 +170,28 @@ function solve(
             continue;
           }
           if (slot.end! > endLimit) {
+            const pref = c.place.preferredArrival;
             recordFail(
               j - 1,
               'over_end_time',
-              `이 장소를 포함하면 일정이 ${formatClock(slot.end!)}에 끝나 희망 종료 시간(${toHHMM(endLimit)})을 넘깁니다.`,
+              pref
+                ? `희망 방문 시간 ${pref} + 체류 ${c.stay}분이면 ${formatClock(
+                    slot.end!,
+                  )}에 끝나 희망 종료 시간(${toHHMM(endLimit)})을 넘깁니다.`
+                : `이 장소를 포함하면 일정이 ${formatClock(slot.end!)}에 끝나 희망 종료 시간(${toHHMM(endLimit)})을 넘깁니다.`,
               arrival,
             );
             continue;
           }
           const orderIndex = state.count; // 0-based 방문 순서
+          // 희망 방문 시간을 맞추려고 기다린 시간은 의도한 것이므로 비용에서 뺀다
+          const penalizedWait = Math.max(
+            0,
+            slot.waitMinutes! - (slot.preferredWaitMinutes ?? 0),
+          );
           const addedCost =
             travel +
-            slot.waitMinutes! * WAIT_WEIGHT +
+            penalizedWait * WAIT_WEIGHT +
             orderIndex * PRIORITY_WEIGHT[c.place.priority];
 
           const next: State = {
@@ -666,10 +676,22 @@ function buildSuggestions(
         message: `현재 체류시간 ${ex.place.stayMinutes}분을 줄이면 일정에 넣을 수 있습니다.`,
       });
     } else if (ex.reason === 'over_end_time') {
-      suggestions.push({
-        title: `${ex.place.name} — 희망 종료 시간 연장`,
-        message: `희망 종료 시간(${settings.endTime})을 늦추거나, 장소 수/체류시간을 줄여 보세요.`,
-      });
+      const prefMin = toMinutes(ex.place.preferredArrival);
+      if (prefMin !== null) {
+        // 희망 방문 시간을 지키려면 종료 시간을 언제까지 늘려야 하는지 콕 집어 알려준다
+        const needEnd = prefMin + Math.max(5, ex.place.stayMinutes);
+        suggestions.push({
+          title: `${ex.place.name} — 희망 종료 시간을 ${toHHMM(needEnd)} 이후로`,
+          message: `희망 방문 시간 ${ex.place.preferredArrival}에 ${ex.place.stayMinutes}분을 머물면 ${toHHMM(
+            needEnd,
+          )}에 끝납니다. 지금 희망 종료 시간은 ${settings.endTime}이라 일정에 넣을 수 없습니다. 종료 시간을 늦추거나 체류시간을 줄여 주세요.`,
+        });
+      } else {
+        suggestions.push({
+          title: `${ex.place.name} — 희망 종료 시간 연장`,
+          message: `희망 종료 시간(${settings.endTime})을 늦추거나, 장소 수/체류시간을 줄여 보세요.`,
+        });
+      }
     } else {
       suggestions.push({
         title: `${ex.place.name} — 일정 분리`,
