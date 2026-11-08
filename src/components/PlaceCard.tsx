@@ -4,7 +4,6 @@ import {
   ChevronDown,
   ChevronUp,
   Clock,
-  Coffee,
   Hourglass,
   MapPin,
   Timer,
@@ -38,6 +37,7 @@ const STAY_PRESETS = [30, 45, 60, 90, 120];
 
 export function PlaceCard({ place, index, date, onUpdate, onRemove }: Props) {
   const [open, setOpen] = useState(false);
+  const [detailOpen, setDetailOpen] = useState(false);
   const meta = CATEGORY_META[place.category];
   const Icon = meta.icon;
   const weekday = weekdayOf(date);
@@ -107,32 +107,34 @@ export function PlaceCard({ place, index, date, onUpdate, onRemove }: Props) {
             {place.address}
           </p>
 
-          <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[12px] text-navy-500">
-            <span className="flex items-center gap-1">
-              <Clock size={12} />
-              영업 {hoursSummary(place.business, weekday ?? undefined)}
+          {/* 핵심 정보 한 줄: 영업시간 · 머무는 시간 · 도착 마감 */}
+          <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[13px]">
+            <span className="flex items-center gap-1.5 font-semibold text-navy-800">
+              <Clock size={13} className="text-navy-400" />
+              {hoursSummary(place.business, weekday ?? undefined)}
             </span>
-            <span className="flex items-center gap-1">
-              <Coffee size={12} />
-              브레이크 {breaksSummary(place.business, weekday ?? undefined)}
+            <span className="text-navy-200">|</span>
+            <span className="flex items-center gap-1.5 text-navy-600">
+              <Timer size={13} className="text-navy-400" />
+              {place.stayMinutes}분 머무름
             </span>
+            {deadline !== null && (
+              <span className="inline-flex items-center gap-1 rounded-lg bg-brand-50 px-2 py-0.5 font-bold text-brand-700">
+                <Hourglass size={12} />
+                {formatClock(deadline)}까지 도착
+              </span>
+            )}
+          </div>
+
+          {/* 보조 정보는 한 단계 작게 */}
+          <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[12px] text-navy-400">
+            <span>브레이크 {breaksSummary(place.business, weekday ?? undefined)}</span>
             <span>{closedDaysSummary(place.business)}</span>
             {eff?.lastOrder && <span>라스트오더 {eff.lastOrder}</span>}
             {(place.business.tempClosures?.length ?? 0) > 0 && (
               <span>임시 휴무 {tempClosureSummary(place.business)}</span>
             )}
           </div>
-
-          {/* 이 장소에 늦어도 몇 시까지 도착해야 하는지 */}
-          {deadline !== null && (
-            <p className="mt-1.5 inline-flex items-center gap-1 rounded-lg bg-brand-50 px-2 py-1 text-[12px] font-semibold text-brand-700">
-              <Hourglass size={11} />
-              {formatClock(deadline)}까지 도착
-              <span className="font-normal text-navy-500">
-                ({place.stayMinutes}분 머무는 기준)
-              </span>
-            </p>
-          )}
         </div>
 
         <button
@@ -145,7 +147,33 @@ export function PlaceCard({ place, index, date, onUpdate, onRemove }: Props) {
         </button>
       </div>
 
-      {/* 체류시간 / 우선순위 */}
+      {/* 세부 설정 — 기본은 접어 두어 목록을 짧게 유지한다 */}
+      <div className="mt-2.5 flex flex-wrap items-center gap-1">
+        <button
+          type="button"
+          className={`btn px-2.5 py-1 text-[12.5px] font-semibold ${
+            detailOpen
+              ? 'bg-navy-900 text-white'
+              : 'border border-navy-200 text-navy-600 hover:bg-navy-50'
+          }`}
+          onClick={() => setDetailOpen((v) => !v)}
+        >
+          {detailOpen ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+          체류시간 · 우선순위 · 희망시간
+        </button>
+        <button
+          type="button"
+          className={`btn px-2.5 py-1 text-[12.5px] font-semibold ${
+            open ? 'bg-navy-900 text-white' : 'border border-navy-200 text-navy-600 hover:bg-navy-50'
+          }`}
+          onClick={() => setOpen((v) => !v)}
+        >
+          {open ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+          영업시간 직접 입력
+        </button>
+      </div>
+
+      {detailOpen && (
       <div className="mt-3 grid gap-3 sm:grid-cols-2">
         <div>
           <span className="mb-1 flex items-center gap-1 text-[11.5px] font-semibold text-navy-500">
@@ -235,15 +263,7 @@ export function PlaceCard({ place, index, date, onUpdate, onRemove }: Props) {
           </div>
         </div>
       </div>
-
-      <button
-        type="button"
-        className="btn-ghost mt-2 px-1 text-[12.5px] font-semibold text-brand-700 hover:bg-brand-50"
-        onClick={() => setOpen((v) => !v)}
-      >
-        {open ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-        영업시간 · 휴무 · 브레이크 타임 {open ? '닫기' : '직접 입력'}
-      </button>
+      )}
 
       {open && (
         <HoursEditor

@@ -30,11 +30,11 @@ export function Timeline({ result, origin, selectedId, onSelect }: Props) {
 
       {/* 출발 */}
       <div className="mt-5 flex items-start gap-3">
-        <div className="flex w-[62px] shrink-0 flex-col items-end pt-0.5">
-          <span className="tnum text-[14px] font-extrabold text-navy-900">
+        <div className="flex w-[66px] shrink-0 flex-col items-end pt-0.5">
+          <span className="tnum text-[16px] font-extrabold leading-tight text-navy-900">
             {formatClock(result.startMinutes)}
           </span>
-          <span className="text-[11px] text-navy-400">출발</span>
+          <span className="text-[11.5px] text-navy-400">출발</span>
         </div>
         <div className="flex-1 rounded-xl border border-dashed border-navy-200 bg-navy-50/60 px-4 py-3">
           <p className="flex items-center gap-1.5 text-[13.5px] font-bold text-navy-800">
@@ -57,7 +57,7 @@ export function Timeline({ result, origin, selectedId, onSelect }: Props) {
             <li key={s.place.id}>
               {/* 이동 구간 */}
               <div className="flex items-stretch gap-3">
-                <div className="flex w-[62px] shrink-0 justify-end pr-1">
+                <div className="flex w-[66px] shrink-0 justify-end pr-1">
                   <span className="my-1 w-px bg-navy-200" />
                 </div>
                 <div className="flex items-center gap-1.5 py-2 text-[12px] font-semibold text-navy-500">
@@ -79,11 +79,11 @@ export function Timeline({ result, origin, selectedId, onSelect }: Props) {
                 onClick={() => onSelect(s.place.id)}
                 className="flex w-full items-start gap-3 text-left"
               >
-                <div className="flex w-[62px] shrink-0 flex-col items-end pt-1">
-                  <span className="tnum text-[14px] font-extrabold text-navy-900">
+                <div className="flex w-[66px] shrink-0 flex-col items-end pt-1">
+                  <span className="tnum text-[17px] font-extrabold leading-tight text-navy-900">
                     {formatClock(s.start)}
                   </span>
-                  <span className="tnum text-[11px] text-navy-400">~{formatClock(s.end)}</span>
+                  <span className="tnum text-[12px] text-navy-400">~{formatClock(s.end)}</span>
                 </div>
 
                 <div
@@ -104,7 +104,7 @@ export function Timeline({ result, origin, selectedId, onSelect }: Props) {
                     <span className={`chip ${meta.bg}`}>{meta.label}</span>
                   </div>
 
-                  <div className="mt-2 grid gap-1 text-[12.5px] text-navy-600 sm:grid-cols-2">
+                  <div className="mt-2 grid gap-x-4 gap-y-1.5 text-[13px] leading-relaxed text-navy-600 sm:grid-cols-2">
                     <span className="tnum">
                       도착 예정 <strong className="font-semibold">{formatClock(s.arrival)}</strong>
                     </span>
@@ -191,11 +191,11 @@ export function Timeline({ result, origin, selectedId, onSelect }: Props) {
 
       {/* 종료 */}
       <div className="mt-3 flex items-start gap-3">
-        <div className="flex w-[62px] shrink-0 flex-col items-end pt-0.5">
-          <span className="tnum text-[14px] font-extrabold text-navy-900">
+        <div className="flex w-[66px] shrink-0 flex-col items-end pt-0.5">
+          <span className="tnum text-[16px] font-extrabold leading-tight text-navy-900">
             {formatClock(result.endMinutes)}
           </span>
-          <span className="text-[11px] text-navy-400">종료</span>
+          <span className="text-[11.5px] text-navy-400">종료</span>
         </div>
         <div className="flex-1 rounded-xl bg-navy-900 px-4 py-3 text-white">
           <p className="flex items-center gap-1.5 text-[13.5px] font-bold">
