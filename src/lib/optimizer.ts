@@ -548,6 +548,17 @@ function buildWarnings(
     });
   }
 
+  const estimated = stops.filter((s) => s.place.business.source === 'estimated');
+  if (estimated.length > 0) {
+    warnings.push({
+      level: 'warn',
+      title: `영업시간 추정값 사용 ${estimated.length}곳`,
+      message: `${estimated
+        .map((s) => s.place.name)
+        .join(', ')} 은(는) 확인된 영업정보가 없어 업종 평균으로 추정한 시간으로 계산했습니다. 실제와 다를 수 있으니 방문 전 확인하거나 영업시간을 직접 입력해 주세요.`,
+    });
+  }
+
   const unverified = stops.filter((s) => s.flags.unverified);
   if (unverified.length > 0) {
     warnings.push({

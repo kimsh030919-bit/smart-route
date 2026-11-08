@@ -3,6 +3,7 @@ import { searchDemoPlaces } from '../data/demoPlaces';
 import type { Origin, PlaceSearchResult } from '../types';
 import { hasVworldKey, searchVworldOrigins, searchVworldPlaces } from './vworld';
 import { haversineKm } from './travel';
+import { applyEstimates } from './estimatedHours';
 
 export type SearchSource = 'kakao' | 'vworld' | 'demo';
 
@@ -31,8 +32,10 @@ export function sortByDistance(
   results: PlaceSearchResult[],
   origin?: Origin | null,
 ): PlaceSearchResult[] {
-  if (!origin) return results;
-  return results
+  // 영업정보가 없는 장소는 업종 평균 기준 추정값으로 채운다 (출처는 'estimated'로 구분)
+  const filled = applyEstimates(results);
+  if (!origin) return filled;
+  return filled
     .map((r) => ({ ...r, distanceKm: haversineKm({ lat: origin.lat, lng: origin.lng }, r) }))
     .sort((a, b) => a.distanceKm - b.distanceKm);
 }

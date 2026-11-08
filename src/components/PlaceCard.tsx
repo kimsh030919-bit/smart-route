@@ -20,6 +20,7 @@ import {
   tempClosureOn,
   tempClosureSummary,
 } from '../lib/businessHours';
+import { isEstimated } from '../lib/estimatedHours';
 import { PRIORITY_LABELS } from '../lib/optimizer';
 import { WEEKDAY_LABELS, weekdayOf } from '../lib/time';
 import { HoursEditor } from './HoursEditor';
@@ -59,11 +60,18 @@ export function PlaceCard({ place, index, date, onUpdate, onRemove }: Props) {
             <span className="text-[14.5px] font-bold text-navy-900">{place.name}</span>
             <span className={`chip ${meta.bg}`}>{meta.label}</span>
             {place.isDemo && <span className="chip bg-navy-100 text-navy-600">데모</span>}
-            {!place.business.verified && (
+            {isEstimated(place.business) ? (
               <span className="chip bg-amber-50 text-amber-700">
                 <AlertTriangle size={11} />
-                정보 확인 필요
+                영업시간 추정
               </span>
+            ) : (
+              !place.business.verified && (
+                <span className="chip bg-amber-50 text-amber-700">
+                  <AlertTriangle size={11} />
+                  정보 확인 필요
+                </span>
+              )
             )}
             {place.business.temporarilyClosed && (
               <span className="chip bg-rose-50 text-rose-700">
@@ -190,6 +198,14 @@ export function PlaceCard({ place, index, date, onUpdate, onRemove }: Props) {
         {open ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
         영업시간 · 휴무 · 브레이크 타임 {open ? '닫기' : '직접 입력'}
       </button>
+
+      {isEstimated(place.business) && (
+        <p className="mt-2 rounded-lg bg-amber-50 px-2.5 py-2 text-[11.5px] leading-relaxed text-amber-800">
+          실제 확인된 영업정보가 없어 <strong>업종 평균으로 추정한 값</strong>입니다.
+          {place.business.note ? ` ${place.business.note}` : ''} 아래에서 직접 입력하면 추정 표시가
+          사라집니다.
+        </p>
+      )}
 
       {open && (
         <HoursEditor

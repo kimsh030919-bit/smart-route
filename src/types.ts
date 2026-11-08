@@ -7,8 +7,14 @@ export type TransportMode = 'walk' | 'transit' | 'car' | 'bike';
 /** 방문 우선순위 */
 export type Priority = 'high' | 'normal' | 'low';
 
-/** 영업정보 출처 (demo: 내장 데모 데이터, user: 사용자가 직접 입력, unknown: 확인 안 됨) */
-export type HoursSource = 'demo' | 'user' | 'unknown';
+/**
+ * 영업정보 출처
+ *  - demo      : 내장 데모 데이터
+ *  - user      : 사용자가 직접 입력 (확인된 정보로 취급)
+ *  - estimated : 업종 평균으로 채운 추정값 (확인된 정보 아님 — UI에 항상 '추정'으로 표시)
+ *  - unknown   : 확인 안 됨
+ */
+export type HoursSource = 'demo' | 'user' | 'estimated' | 'unknown';
 
 export interface TimeRange {
   /** "HH:MM" */
