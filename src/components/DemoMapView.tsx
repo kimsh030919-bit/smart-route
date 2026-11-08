@@ -67,13 +67,13 @@ export function DemoMapView({ stops, origin, selectedId, onSelect, roadPath }: P
     <svg viewBox={`0 0 ${W} ${H}`} className="h-full w-full" role="img" aria-label="데모 경로 지도">
       <defs>
         <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
-          <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#e3eaf6" strokeWidth="1" />
+          <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#e7e7ea" strokeWidth="1" />
         </pattern>
       </defs>
-      <rect width={W} height={H} fill="#f8fafc" />
+      <rect width={W} height={H} fill="#f8f9fa" />
       <rect width={W} height={H} fill="url(#grid)" />
 
-      <text x={16} y={26} fontSize="12.5" fill="#94a3b8" fontWeight="600">
+      <text x={16} y={26} fontSize="12.5" fill="#a1a1aa" fontWeight="600">
         데모 지도 (실제 지도 타일 아님 · 좌표 개념도)
       </text>
 
@@ -87,7 +87,7 @@ export function DemoMapView({ stops, origin, selectedId, onSelect, roadPath }: P
             })
             .join(' ')}
           fill="none"
-          stroke="#2340e4"
+          stroke="#ff3366"
           strokeWidth="3.5"
           strokeOpacity="0.8"
           strokeLinecap="round"
@@ -98,7 +98,7 @@ export function DemoMapView({ stops, origin, selectedId, onSelect, roadPath }: P
           <polyline
             points={points.map((p) => `${p.x},${p.y}`).join(' ')}
             fill="none"
-            stroke="#2340e4"
+            stroke="#ff3366"
             strokeWidth="3"
             strokeOpacity="0.55"
             strokeDasharray="8 6"
@@ -115,8 +115,8 @@ export function DemoMapView({ stops, origin, selectedId, onSelect, roadPath }: P
         const my = (from.y + to.y) / 2;
         return (
           <g key={`leg-${s.place.id}`}>
-            <rect x={mx - 36} y={my - 11} width={72} height={20} rx={10} fill="#fff" stroke="#dbe6ff" />
-            <text x={mx} y={my + 3} fontSize="11" textAnchor="middle" fill="#2340e4" fontWeight="700">
+            <rect x={mx - 36} y={my - 11} width={72} height={20} rx={10} fill="#fff" stroke="#ffe1e9" />
+            <text x={mx} y={my + 3} fontSize="11" textAnchor="middle" fill="#ff3366" fontWeight="700">
               {s.travelFromPrevMinutes}분 · {s.distanceFromPrevKm.toFixed(1)}km
             </text>
           </g>
@@ -125,14 +125,14 @@ export function DemoMapView({ stops, origin, selectedId, onSelect, roadPath }: P
 
       {origin && (
         <g>
-          <circle cx={points[0].x} cy={points[0].y} r={11} fill="#1b2b46" />
-          <circle cx={points[0].x} cy={points[0].y} r={4} fill="#7dd3fc" />
+          <circle cx={points[0].x} cy={points[0].y} r={11} fill="#18181b" />
+          <circle cx={points[0].x} cy={points[0].y} r={4} fill="#ffb2ba" />
           <text
             x={points[0].x}
             y={points[0].y + 28}
             fontSize="11.5"
             textAnchor="middle"
-            fill="#334155"
+            fill="#52525b"
             fontWeight="700"
           >
             출발 · {origin.name}
@@ -153,13 +153,13 @@ export function DemoMapView({ stops, origin, selectedId, onSelect, roadPath }: P
             role="button"
             aria-label={`${s.order}번 ${s.place.name} 상세보기`}
           >
-            {selected && <circle cx={p.x} cy={p.y} r={21} fill="#2340e4" fillOpacity={0.14} />}
+            {selected && <circle cx={p.x} cy={p.y} r={21} fill="#ff3366" fillOpacity={0.14} />}
             <circle
               cx={p.x}
               cy={p.y}
               r={14}
               fill={color}
-              stroke={selected ? '#2340e4' : '#fff'}
+              stroke={selected ? '#ff3366' : '#fff'}
               strokeWidth={selected ? 3 : 2}
             />
             <text
@@ -177,7 +177,7 @@ export function DemoMapView({ stops, origin, selectedId, onSelect, roadPath }: P
               y={p.y + 31}
               fontSize="11.5"
               textAnchor="middle"
-              fill="#1b2b46"
+              fill="#18181b"
               fontWeight="700"
             >
               {s.place.name}

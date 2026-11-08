@@ -49,7 +49,7 @@ export function VWorldMapView({ stops, origin, selectedId, onSelect, layer, road
     const routeSource = new VectorSource();
     const route = new VectorLayer({
       source: routeSource,
-      style: new Style({ stroke: new Stroke({ color: '#2340e4', width: 4, lineDash: [1, 0] }) }),
+      style: new Style({ stroke: new Stroke({ color: '#ff3366', width: 4, lineDash: [1, 0] }) }),
     });
 
     mapRef.current = new Map({
@@ -102,7 +102,7 @@ export function VWorldMapView({ stops, origin, selectedId, onSelect, layer, road
     if (origin) {
       const el = document.createElement('div');
       el.style.cssText =
-        'display:flex;align-items:center;gap:5px;padding:4px 9px;border-radius:999px;background:#1b2b46;' +
+        'display:flex;align-items:center;gap:5px;padding:4px 9px;border-radius:999px;background:#18181b;' +
         'color:#fff;font-size:11.5px;font-weight:700;white-space:nowrap;transform:translate(-50%,-150%);' +
         'box-shadow:0 6px 16px -6px rgba(16,24,40,.4);';
       el.textContent = `출발 · ${origin.name}`;
@@ -123,14 +123,14 @@ export function VWorldMapView({ stops, origin, selectedId, onSelect, layer, road
       el.innerHTML = `
         <div style="display:flex;flex-direction:column;align-items:center;">
           <div style="display:flex;align-items:center;gap:6px;padding:4px 8px 4px 4px;border-radius:999px;
-            background:#fff;border:1.5px solid ${selected ? '#2340e4' : 'rgba(16,24,40,.12)'};
-            box-shadow:0 6px 16px -6px rgba(16,24,40,.35);font-size:12px;font-weight:700;color:#1b2b46;
+            background:#fff;border:1.5px solid ${selected ? '#ff3366' : 'rgba(16,24,40,.12)'};
+            box-shadow:0 6px 16px -6px rgba(16,24,40,.35);font-size:12px;font-weight:700;color:#18181b;
             white-space:nowrap;max-width:190px;overflow:hidden;text-overflow:ellipsis;">
             <span style="display:flex;width:20px;height:20px;align-items:center;justify-content:center;
               border-radius:999px;background:${color};color:#fff;font-size:11px;">${s.order}</span>
             ${s.place.name}
           </div>
-          <div style="width:2px;height:10px;background:${selected ? '#2340e4' : color};"></div>
+          <div style="width:2px;height:10px;background:${selected ? '#ff3366' : color};"></div>
         </div>`;
       el.addEventListener('click', () => onSelect(s.place.id));
       const ov = new Overlay({
