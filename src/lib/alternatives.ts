@@ -1,5 +1,5 @@
 import type { Category, Place, PlaceSearchResult } from '../types';
-import { CATEGORY_META } from '../data/categories';
+import { CATEGORY_META, categoryFromVworld } from '../data/categories';
 import { DEMO_PLACES } from '../data/demoPlaces';
 import { bboxOfPoints, hasVworldKey, searchVworldPlaces } from './vworld';
 import { haversineKm } from './travel';
@@ -26,7 +26,8 @@ const CATEGORY_KEYWORDS: Record<Category, string[]> = {
   shopping: ['마트', '시장'],
   cinema: ['영화관', '시네마'],
   park: ['공원'],
-  etc: ['편의점'],
+  // 업종을 알 수 없을 때는 편의점 같은 곳 대신 카페·음식점 위주로 찾는다
+  etc: ['카페', '커피', '빵', '식당'],
 };
 
 export interface Alternative {
@@ -63,7 +64,11 @@ async function searchNearbyViaVworld(
   const bbox = bboxOfPoints([{ lat: place.lat, lng: place.lng }], radiusKm);
   if (!bbox) return [];
 
-  const keywords = CATEGORY_KEYWORDS[place.category];
+  // 업종이 '기타'로 잡힌 장소는 상호명으로 한 번 더 추정한다.
+  // (브이월드 업종이 통신판매업 등으로 등록돼 있어도 이름이 "…쿠키"면 카페로 본다)
+  const category =
+    place.category === 'etc' ? categoryFromVworld('', place.name) : place.category;
+  const keywords = CATEGORY_KEYWORDS[category];
   // 브이월드는 거리순이 아니라 자체 순위로 응답한다.
   // 반경 안에 후보가 100곳 넘게 있을 수 있어 넉넉히 받아 와서 직접 거리순으로 정렬한다.
   const batches = await Promise.all(
@@ -75,10 +80,12 @@ async function searchNearbyViaVworld(
   );
 
   // 같은 업종만 남기고 중복 제거
+  // (업종을 끝내 알 수 없으면 '기타'로 분류된 결과만 걸러낸다 — 편의점 등 노이즈 제거)
+  const accept = (c: Category) => (category === 'etc' ? c !== 'etc' : c === category);
   const seen = new Set<string>();
   const out: PlaceSearchResult[] = [];
   for (const r of batches.flat()) {
-    if (r.category !== place.category) continue;
+    if (!accept(r.category)) continue;
     const key = `${r.name}|${r.lat.toFixed(4)}|${r.lng.toFixed(4)}`;
     if (seen.has(key)) continue;
     seen.add(key);
