@@ -7,6 +7,8 @@ interface Props {
   origin: Origin | null;
   selectedId: string | null;
   onSelect: (id: string) => void;
+  /** 도로를 따라가는 좌표열. 없으면 지점을 잇는 직선으로 그린다. */
+  roadPath?: { lat: number; lng: number }[];
 }
 
 function pinHtml(order: number, name: string, color: string, selected: boolean): string {
@@ -33,7 +35,7 @@ function originHtml(name: string): string {
   </div>`;
 }
 
-export function KakaoMapView({ stops, origin, selectedId, onSelect }: Props) {
+export function KakaoMapView({ stops, origin, selectedId, onSelect, roadPath }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<kakao.maps.Map | null>(null);
   const overlaysRef = useRef<kakao.maps.CustomOverlay[]>([]);
@@ -101,9 +103,15 @@ export function KakaoMapView({ stops, origin, selectedId, onSelect }: Props) {
       overlaysRef.current.push(ov);
     });
 
-    if (path.length >= 2) {
+    // 도로 경로가 있으면 그대로, 없으면 지점을 잇는 직선으로 폴백
+    const linePath =
+      roadPath && roadPath.length >= 2
+        ? roadPath.map((p) => new k.maps.LatLng(p.lat, p.lng))
+        : path;
+
+    if (linePath.length >= 2) {
       lineRef.current = new k.maps.Polyline({
-        path,
+        path: linePath,
         strokeWeight: 4,
         strokeColor: '#2340e4',
         strokeOpacity: 0.75,
@@ -115,7 +123,7 @@ export function KakaoMapView({ stops, origin, selectedId, onSelect }: Props) {
     if (!bounds.isEmpty()) {
       map.setBounds(bounds, 60, 60);
     }
-  }, [stops, origin, selectedId, onSelect]);
+  }, [stops, origin, selectedId, onSelect, roadPath]);
 
   return <div ref={containerRef} className="h-full w-full" />;
 }

@@ -23,10 +23,12 @@ interface Props {
   selectedId: string | null;
   onSelect: (id: string) => void;
   layer: VworldLayer;
+  /** 도로를 따라가는 좌표열. 없으면 지점을 잇는 직선으로 그린다. */
+  roadPath?: { lat: number; lng: number }[];
 }
 
 /** 브이월드 WMTS 타일 + OpenLayers 로 그리는 지도 */
-export function VWorldMapView({ stops, origin, selectedId, onSelect, layer }: Props) {
+export function VWorldMapView({ stops, origin, selectedId, onSelect, layer, roadPath }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<Map | null>(null);
   const tileRef = useRef<TileLayer<XYZ> | null>(null);
@@ -141,7 +143,12 @@ export function VWorldMapView({ stops, origin, selectedId, onSelect, layer }: Pr
     });
 
     if (coords.length >= 2) {
-      const line = new LineString(coords.map((c) => fromLonLat(c)));
+      // 도로 경로가 있으면 그대로, 없으면 지점을 잇는 직선으로 폴백
+      const lineCoords =
+        roadPath && roadPath.length >= 2
+          ? roadPath.map((p) => fromLonLat([p.lng, p.lat]))
+          : coords.map((c) => fromLonLat(c));
+      const line = new LineString(lineCoords);
       routeSource.addFeature(new Feature(line));
       map.getView().fit(line.getExtent(), {
         padding: [70, 70, 70, 70],
@@ -151,7 +158,7 @@ export function VWorldMapView({ stops, origin, selectedId, onSelect, layer }: Pr
     } else {
       map.getView().setCenter(fromLonLat(coords[0]));
     }
-  }, [stops, origin, selectedId, onSelect]);
+  }, [stops, origin, selectedId, onSelect, roadPath]);
 
   return <div ref={containerRef} className="h-full w-full" />;
 }

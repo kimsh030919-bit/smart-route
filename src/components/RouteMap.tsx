@@ -1,4 +1,5 @@
-import { Suspense, lazy, useMemo, useState } from 'react';
+import { Suspense, lazy, useEffect, useMemo, useState } from 'react';
+import { fetchRoadPath, type RoadPath } from '../lib/roadPath';
 import { Clock, Coffee, Info, Layers, Loader2, MapPin, Route, Timer, X } from 'lucide-react';
 import type { Origin, Stop, TransportMode } from '../types';
 import { KakaoMapView } from './KakaoMapView';
@@ -55,6 +56,29 @@ export function RouteMap({
   const [layer, setLayer] = useState<VworldLayer>('Base');
   const active: MapProvider = providers.includes(provider) ? provider : providers[0];
   const selected = stops.find((s) => s.place.id === selectedId) ?? null;
+
+  // 실제 도로를 따라가는 경로선 (실패하면 null → 직선으로 폴백)
+  const [roadPath, setRoadPath] = useState<RoadPath | null>(null);
+  const [roadLoading, setRoadLoading] = useState(false);
+
+  const waypoints = useMemo(() => {
+    const pts = origin ? [{ lat: origin.lat, lng: origin.lng }] : [];
+    stops.forEach((s) => pts.push({ lat: s.place.lat, lng: s.place.lng }));
+    return pts;
+  }, [origin, stops]);
+
+  useEffect(() => {
+    if (waypoints.length < 2) {
+      setRoadPath(null);
+      return;
+    }
+    const controller = new AbortController();
+    setRoadLoading(true);
+    fetchRoadPath(waypoints, controller.signal)
+      .then((res) => setRoadPath(res))
+      .finally(() => setRoadLoading(false));
+    return () => controller.abort();
+  }, [waypoints]);
 
   return (
     <section className="card overflow-hidden">
@@ -131,6 +155,7 @@ export function RouteMap({
               selectedId={selectedId}
               onSelect={(id) => onSelect(id)}
               layer={layer}
+              roadPath={roadPath?.path}
             />
           </Suspense>
         ) : active === 'kakao' ? (
@@ -139,6 +164,7 @@ export function RouteMap({
             origin={origin}
             selectedId={selectedId}
             onSelect={(id) => onSelect(id)}
+            roadPath={roadPath?.path}
           />
         ) : (
           <DemoMapView
@@ -146,6 +172,7 @@ export function RouteMap({
             origin={origin}
             selectedId={selectedId}
             onSelect={(id) => onSelect(id)}
+            roadPath={roadPath?.path}
           />
         )}
 
@@ -222,12 +249,15 @@ export function RouteMap({
       </div>
 
       <p className="border-t border-navy-100 px-5 py-3 text-[11.5px] leading-relaxed text-navy-400">
-        {active === 'vworld' &&
-          '배경지도는 브이월드(국토교통부 공간정보 오픈플랫폼) WMTS 타일입니다. 경로선은 번호 순서를 잇는 직선이며 실제 도로 경로가 아닙니다.'}
-        {active === 'kakao' &&
-          '지도는 카카오맵 API로 표시됩니다. 경로선은 번호 순서를 잇는 직선이며 실제 도로 경로가 아닙니다.'}
+        {active === 'vworld' && '배경지도는 브이월드(국토교통부 공간정보 오픈플랫폼) WMTS 타일입니다. '}
+        {active === 'kakao' && '지도는 카카오맵 API로 표시됩니다. '}
         {active === 'demo' &&
-          '지도 API 키가 없어 데모 지도(좌표 개념도)로 표시합니다. 브이월드 또는 카카오맵 키를 설정하면 실제 지도로 전환됩니다.'}
+          '지도 API 키가 없어 데모 지도(좌표 개념도)로 표시합니다. 브이월드 또는 카카오맵 키를 설정하면 실제 지도로 전환됩니다. '}
+        {roadLoading
+          ? '도로 경로를 불러오는 중입니다…'
+          : roadPath
+            ? `경로선은 OSRM으로 계산한 실제 도로 경로입니다. (자동차 도로 기준 · 도로 거리 ${roadPath.distanceKm.toFixed(1)}km) 브이월드는 길찾기를 제공하지 않아 라우팅은 별도 엔진을 사용합니다.`
+            : '도로 경로를 가져오지 못해 번호 순서를 잇는 직선으로 표시합니다.'}
       </p>
     </section>
   );

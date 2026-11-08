@@ -6,6 +6,8 @@ interface Props {
   origin: Origin | null;
   selectedId: string | null;
   onSelect: (id: string) => void;
+  /** 도로를 따라가는 좌표열. 없으면 지점을 잇는 직선으로 그린다. */
+  roadPath?: { lat: number; lng: number }[];
 }
 
 const W = 800;
@@ -21,10 +23,12 @@ function toPlane(lat: number, lng: number) {
  * 지도 API 키가 없을 때 사용하는 데모 지도.
  * 실제 지도 타일이 아니라 좌표를 평면에 투영한 개념도이며, 화면에도 그렇게 표시한다.
  */
-export function DemoMapView({ stops, origin, selectedId, onSelect }: Props) {
+export function DemoMapView({ stops, origin, selectedId, onSelect, roadPath }: Props) {
   const nodes = [
     ...(origin ? [{ id: '__origin__', lat: origin.lat, lng: origin.lng }] : []),
     ...stops.map((s) => ({ id: s.place.id, lat: s.place.lat, lng: s.place.lng })),
+    // 도로 경로가 화면 밖으로 나가지 않도록 경계 계산에 포함
+    ...(roadPath ?? []).map((p, i) => ({ id: `__road${i}__`, lat: p.lat, lng: p.lng })),
   ];
 
   if (nodes.length === 0) {
@@ -73,16 +77,34 @@ export function DemoMapView({ stops, origin, selectedId, onSelect }: Props) {
         데모 지도 (실제 지도 타일 아님 · 좌표 개념도)
       </text>
 
-      {points.length >= 2 && (
+      {/* 도로 경로가 있으면 실선으로, 없으면 지점을 잇는 점선으로 */}
+      {roadPath && roadPath.length >= 2 ? (
         <polyline
-          points={points.map((p) => `${p.x},${p.y}`).join(' ')}
+          points={roadPath
+            .map((p) => {
+              const q = project(p.lat, p.lng);
+              return `${q.x},${q.y}`;
+            })
+            .join(' ')}
           fill="none"
           stroke="#2340e4"
-          strokeWidth="3"
-          strokeOpacity="0.55"
-          strokeDasharray="8 6"
+          strokeWidth="3.5"
+          strokeOpacity="0.8"
           strokeLinecap="round"
+          strokeLinejoin="round"
         />
+      ) : (
+        points.length >= 2 && (
+          <polyline
+            points={points.map((p) => `${p.x},${p.y}`).join(' ')}
+            fill="none"
+            stroke="#2340e4"
+            strokeWidth="3"
+            strokeOpacity="0.55"
+            strokeDasharray="8 6"
+            strokeLinecap="round"
+          />
+        )
       )}
 
       {stops.map((s, i) => {
