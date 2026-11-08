@@ -12,10 +12,9 @@ export type Priority = 'high' | 'normal' | 'low';
  *  - google    : 구글 지도(Places API)가 제공한 실제 영업시간
  *  - osm       : OpenStreetMap 에 등록된 실제 영업시간 (키 불필요, 커뮤니티 입력)
  *  - user      : 사용자가 직접 입력 (확인된 정보로 취급)
- *  - estimated : 업종 평균으로 채운 추정값 (확인된 정보 아님)
  *  - unknown   : 확인 안 됨
  */
-export type HoursSource = 'google' | 'osm' | 'user' | 'estimated' | 'unknown';
+export type HoursSource = 'google' | 'osm' | 'user' | 'unknown';
 
 export interface TimeRange {
   /** "HH:MM" */

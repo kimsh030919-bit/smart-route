@@ -2,7 +2,6 @@ import { CATEGORY_META, categoryFromKakao } from '../data/categories';
 import type { Origin, PlaceSearchResult } from '../types';
 import { hasVworldKey, searchVworldOrigins, searchVworldPlaces } from './vworld';
 import { haversineKm } from './travel';
-import { applyEstimates } from './estimatedHours';
 import { hasGoogleKey, searchGooglePlaces } from './googlePlaces';
 
 export type SearchSource = 'google' | 'kakao' | 'vworld';
@@ -32,10 +31,9 @@ export function sortByDistance(
   results: PlaceSearchResult[],
   origin?: Origin | null,
 ): PlaceSearchResult[] {
-  // 영업정보가 없는 장소는 업종 평균 기준 추정값으로 채운다 (출처는 'estimated'로 구분)
-  const filled = applyEstimates(results);
-  if (!origin) return filled;
-  return filled
+  // 영업시간은 임의로 만들어 내지 않는다. 지도(OSM)에서 가져오거나 사용자가 입력한 값만 쓴다.
+  if (!origin) return results;
+  return results
     .map((r) => ({ ...r, distanceKm: haversineKm({ lat: origin.lat, lng: origin.lng }, r) }))
     .sort((a, b) => a.distanceKm - b.distanceKm);
 }
@@ -108,7 +106,7 @@ export async function searchPlaces(
       results: sortByDistance(merged, origin),
       notice:
         merged.length > 0
-          ? '브이월드(공간정보 오픈플랫폼) 검색 결과입니다. 브이월드는 영업시간·휴무·브레이크타임을 제공하지 않아 "정보 확인 필요"로 추가되며, 직접 입력하면 동선 계산에 반영됩니다.'
+          ? '브이월드(공간정보 오픈플랫폼) 검색 결과입니다. 브이월드는 영업시간을 제공하지 않아, 영업시간은 OpenStreetMap에 등록된 실제 값을 따로 불러옵니다. 지도에 등록이 없는 장소는 영업시간을 지어내지 않고 비워 두며, 직접 입력하면 동선 계산에 반영됩니다.'
           : null,
     };
   }
@@ -160,7 +158,7 @@ export async function searchPlaces(
     results: sortByDistance(results, origin),
     notice:
       results.length > 0
-        ? '카카오맵 검색 결과입니다. 영업시간·휴무·브레이크타임은 제공되지 않아 "정보 확인 필요"로 추가되며, 직접 입력하면 동선 계산에 반영됩니다.'
+        ? '카카오맵 검색 결과입니다. 카카오는 영업시간을 제공하지 않아, 영업시간은 OpenStreetMap에 등록된 실제 값을 따로 불러옵니다. 지도에 등록이 없는 장소는 영업시간을 지어내지 않고 비워 두며, 직접 입력하면 동선 계산에 반영됩니다.'
         : null,
   };
 }

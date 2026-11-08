@@ -55,6 +55,22 @@ export function loadState(): PersistedState | null {
         // 예전 버전에서 저장된 가상의 데모 장소는 버린다
         !p.id.startsWith('demo-'),
     );
+    // 예전 버전이 업종 평균으로 "추정"해 넣었던 영업시간은 지도에서 온 값이 아니므로 버린다.
+    // (지워 두면 지도 조회가 다시 돌면서 실제 영업시간으로 채워진다)
+    parsed.places = parsed.places.map((p) =>
+      (p.business.source as string) === 'estimated'
+        ? {
+            ...p,
+            business: {
+              verified: false,
+              breaks: [],
+              closedWeekdays: [],
+              temporarilyClosed: false,
+              source: 'unknown',
+            },
+          }
+        : p,
+    );
     // 예전 버전의 데모 출발지도 버린다
     if (parsed.settings.origin && /\(데모\)/.test(parsed.settings.origin.name)) {
       parsed.settings.origin = null;

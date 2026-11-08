@@ -23,8 +23,14 @@ const ENDPOINTS = [
   'https://overpass.private.coffee/api/interpreter',
 ];
 
-/** 공개 Overpass 서버는 동시 요청을 제한한다(429). 짧게 기다렸다 다시 시도한다. */
-const RETRY_DELAYS_MS = [0, 1200, 3000];
+/**
+ * 공개 Overpass 서버는 자주 혼잡하다(429/502/503 — "All query workers are busy").
+ * 서버 안내대로 지수적으로 간격을 늘려 재시도하고, 과하게 두드리지 않는다.
+ */
+const RETRY_DELAYS_MS = [0, 4000];
+
+/** 미러 한 곳이 느릴 때 기다릴 최대 시간(ms) */
+const ENDPOINT_TIMEOUT_MS = 9000;
 
 const sleep = (ms: number, signal?: AbortSignal): Promise<void> =>
   new Promise((resolve, reject) => {
@@ -376,34 +382,43 @@ export async function fetchOsmHours(
   let elements: OverpassElement[] | null = null;
   let lastError = '';
 
-  outer: for (const delay of RETRY_DELAYS_MS) {
+  /** 한 엔드포인트에 질의한다. 실패하면 거부(reject)해서 Promise.any 가 다음 후보를 쓰게 한다. */
+  const ask = async (endpoint: string): Promise<OverpassElement[]> => {
+    // 미러 하나가 응답하지 않을 때 전체가 멈추지 않도록 엔드포인트마다 제한시간을 둔다
+    const timeout = AbortSignal.timeout(ENDPOINT_TIMEOUT_MS);
+    const combined = signal ? AbortSignal.any([signal, timeout]) : timeout;
+    const res = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ data: query }).toString(),
+      signal: combined,
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const json = (await res.json()) as { elements?: OverpassElement[] };
+    return json.elements ?? [];
+  };
+
+  // 공개 Overpass 미러는 수시로 503/429 를 돌려준다.
+  // 순서대로 기다리면 한 번의 조회가 1분 가까이 걸릴 수 있으므로
+  // 미러들에 동시에 묻고 **먼저 성공한 응답**을 쓴다.
+  for (const delay of RETRY_DELAYS_MS) {
     await sleep(delay, signal);
-    for (const endpoint of ENDPOINTS) {
-      try {
-        const res = await fetch(endpoint, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          body: new URLSearchParams({ data: query }).toString(),
-          signal,
-        });
-        if (!res.ok) {
-          lastError = `HTTP ${res.status}`;
-          continue;
-        }
-        const json = (await res.json()) as { elements?: OverpassElement[] };
-        elements = json.elements ?? [];
-        break outer;
-      } catch (e) {
-        if (signal?.aborted) throw e;
-        lastError = e instanceof Error ? e.message : String(e);
-      }
+    try {
+      elements = await Promise.any(ENDPOINTS.map(ask));
+      break;
+    } catch (e) {
+      if (signal?.aborted) throw e;
+      const errors = e instanceof AggregateError ? e.errors : [e];
+      lastError = errors
+        .map((x) => (x instanceof Error ? x.message : String(x)))
+        .join(', ');
     }
   }
 
   if (elements === null) {
     throw new Error(
-      lastError.includes('429')
-        ? 'OpenStreetMap 영업시간 서버가 혼잡합니다(요청 제한). 잠시 후 다시 시도해 주세요.'
+      /429|50[23]|TimeoutError|timed out/.test(lastError)
+        ? 'OpenStreetMap 영업시간 서버가 혼잡합니다(무료 공개 서버). 잠시 후 다시 시도해 주세요.'
         : `OpenStreetMap 영업시간 서버에 연결하지 못했습니다. (${lastError || '알 수 없는 오류'})`,
     );
   }

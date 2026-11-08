@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { AlertCircle, Check, Hourglass, Info, Loader2, MapPin, Plus, Search } from 'lucide-react';
 import type { Origin, PlaceSearchResult } from '../types';
 import { CATEGORY_META } from '../data/categories';
@@ -9,8 +9,12 @@ import {
   sourceLabel,
   type SearchSource,
 } from '../lib/placeSearch';
+import { fetchOsmHours } from '../lib/osmHours';
 import { breaksSummary, hoursSummary, latestArrival } from '../lib/businessHours';
 import { formatClock, weekdayOf } from '../lib/time';
+
+/** 한 번의 검색에서 지도 영업시간을 조회할 결과 수 (공개 Overpass 서버 부담을 줄인다) */
+const HOURS_LOOKUP_LIMIT = 10;
 
 /** 1km 미만은 m 단위로 */
 function formatDistance(km: number): string {
@@ -50,7 +54,59 @@ export function PlaceSearchPanel({ date, origin, kakaoReady, addedIds, full, onA
   const [source, setSource] = useState<SearchSource | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [hoursLoading, setHoursLoading] = useState(false);
+  /** 지도 영업시간을 실제로 조회해 본 결과 id (조회 안 한 곳과 "정보 없음"을 구분하기 위해) */
+  const [checkedIds, setCheckedIds] = useState<Set<string>>(new Set());
+  /** 지도 영업시간 조회가 실패했을 때의 안내 (무료 공개 서버는 자주 혼잡하다) */
+  const [hoursError, setHoursError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  /** 검색이 바뀌면 이전 영업시간 조회는 버린다 */
+  const hoursAbort = useRef<AbortController | null>(null);
+
+  /**
+   * 검색 결과의 **실제 지도 영업시간**을 OpenStreetMap 에서 채운다.
+   * 목록에서부터 진짜 영업시간이 보이도록, 가까운 순 앞쪽 결과를 한 번의 호출로 조회한다.
+   * 지도에 등록이 없는 장소는 손대지 않고 "지도에 영업시간 정보 없음"으로 남긴다.
+   * (영업시간을 임의로 만들어 넣지 않는다)
+   */
+  async function fillHours(list: PlaceSearchResult[]) {
+    hoursAbort.current?.abort();
+    const ctrl = new AbortController();
+    hoursAbort.current = ctrl;
+    setCheckedIds(new Set());
+    setHoursError(null);
+    if (list.length === 0) return;
+
+    // 전국에 흩어진 결과를 한꺼번에 조회하면 공개 Overpass 서버가 느려진다.
+    // 가까운 순으로 앞쪽 일부만 조회하고, 나머지는 담을 때 자동으로 채운다.
+    const target = list.slice(0, HOURS_LOOKUP_LIMIT);
+
+    setHoursLoading(true);
+    try {
+      const found = await fetchOsmHours(
+        target.map((r) => ({ id: r.id, name: r.name, lat: r.lat, lng: r.lng })),
+        ctrl.signal,
+      );
+      if (ctrl.signal.aborted) return;
+      setCheckedIds(new Set(target.map((r) => r.id)));
+      if (found.size === 0) return;
+      setResults((prev) =>
+        prev.map((r) => {
+          const m = found.get(r.id);
+          return m ? { ...r, business: m.business } : r;
+        }),
+      );
+    } catch (e) {
+      // 조회 실패는 목록 표시를 막지 않는다. 다만 왜 영업시간이 비었는지는 알려 준다.
+      if (!ctrl.signal.aborted) {
+        setHoursError(
+          e instanceof Error ? e.message : '지도 영업시간을 불러오지 못했습니다.',
+        );
+      }
+    } finally {
+      if (!ctrl.signal.aborted) setHoursLoading(false);
+    }
+  }
 
   async function run(e?: React.FormEvent, overrideSource?: SearchSource) {
     e?.preventDefault();
@@ -72,6 +128,8 @@ export function PlaceSearchPanel({ date, origin, kakaoReady, addedIds, full, onA
       setNotice(res.notice);
       if (res.results.length === 0) {
         setError('검색 결과가 없습니다. 다른 키워드로 시도해 보세요.');
+      } else {
+        void fillHours(res.results);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : '검색 중 오류가 발생했습니다.');
@@ -163,6 +221,23 @@ export function PlaceSearchPanel({ date, origin, kakaoReady, addedIds, full, onA
         </p>
       )}
 
+      {hoursError && results.length > 0 && (
+        <p className="mt-3 flex items-start gap-1.5 rounded-xl bg-amber-50 px-3 py-2.5 text-[12.5px] leading-relaxed text-amber-900">
+          <AlertCircle size={14} className="mt-0.5 shrink-0" />
+          <span>
+            {hoursError} 목록의 영업시간은 비어 있지만, 장소를 담으면 자동으로 다시 조회합니다.
+            <button
+              type="button"
+              className="ml-1.5 font-bold underline underline-offset-2"
+              onClick={() => void fillHours(results)}
+              disabled={hoursLoading}
+            >
+              지금 다시 시도
+            </button>
+          </span>
+        </p>
+      )}
+
       {error && (
         <p className="mt-3 flex items-start gap-1.5 rounded-xl bg-rose-50 px-3 py-2.5 text-[12.5px] leading-relaxed text-rose-700">
           <AlertCircle size={14} className="mt-0.5 shrink-0" />
@@ -200,8 +275,14 @@ export function PlaceSearchPanel({ date, origin, kakaoReady, addedIds, full, onA
                 <p className="flex flex-wrap items-center gap-1.5 text-[14px] font-semibold text-navy-900">
                   {r.name}
                   <span className={`chip ${meta.bg}`}>{meta.label}</span>
-                  {!r.business.verified && (
-                    <span className="chip bg-amber-50 text-amber-700">정보 확인 필요</span>
+                  {r.business.source === 'osm' ? (
+                    <span className="chip bg-emerald-50 text-emerald-700">지도 영업시간</span>
+                  ) : (
+                    !r.business.verified &&
+                    !hoursLoading &&
+                    checkedIds.has(r.id) && (
+                      <span className="chip bg-amber-50 text-amber-700">정보 확인 필요</span>
+                    )
                   )}
                 </p>
                 <p className="mt-0.5 truncate text-[12px] text-navy-400">{r.address}</p>
@@ -212,8 +293,22 @@ export function PlaceSearchPanel({ date, origin, kakaoReady, addedIds, full, onA
                     </span>
                   )}
                   <span>
-                    영업 {hoursSummary(r.business, weekday ?? undefined)}
-                    {r.business.breaks.length > 0 && ` · 브레이크 ${breaksSummary(r.business, weekday ?? undefined)}`}
+                    {r.business.verified ? (
+                      <>
+                        영업 {hoursSummary(r.business, weekday ?? undefined)}
+                        {r.business.breaks.length > 0 &&
+                          ` · 브레이크 ${breaksSummary(r.business, weekday ?? undefined)}`}
+                      </>
+                    ) : hoursLoading ? (
+                      <span className="inline-flex items-center gap-1 text-navy-400">
+                        <Loader2 size={11} className="animate-spin" />
+                        지도에서 영업시간 확인 중
+                      </span>
+                    ) : checkedIds.has(r.id) ? (
+                      <span className="text-navy-400">지도에 영업시간 정보 없음</span>
+                    ) : (
+                      <span className="text-navy-400">담으면 영업시간을 확인합니다</span>
+                    )}
                     {' · 체류 '}
                     {r.defaultStayMinutes}분
                   </span>

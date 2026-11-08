@@ -87,6 +87,12 @@ export function PlaceCard({ place, index, date, onUpdate, onRemove }: Props) {
             </span>
             <span className="text-[14.5px] font-bold text-navy-900">{place.name}</span>
             <span className={`chip ${meta.bg}`}>{meta.label}</span>
+            {place.business.source === 'osm' && (
+              <span className="chip bg-emerald-50 text-emerald-700">지도 영업시간</span>
+            )}
+            {place.business.source === 'user' && (
+              <span className="chip bg-navy-100 text-navy-600">직접 입력</span>
+            )}
             {!place.business.verified && (
               <span className="chip bg-amber-50 text-amber-700">
                 <AlertTriangle size={11} />
