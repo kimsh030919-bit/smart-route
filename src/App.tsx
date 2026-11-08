@@ -27,7 +27,7 @@ import { useKakaoLoader } from './hooks/useKakaoLoader';
 import { DEMO_ORIGINS, DEMO_PLACES, nextDateForWeekday, type DemoScenario } from './data/demoPlaces';
 import { optimizeSchedule } from './lib/optimizer';
 import { loadState, saveState } from './lib/storage';
-import { todayISO } from './lib/time';
+import { toMinutes, todayISO } from './lib/time';
 import type { Place, PlaceSearchResult, ScheduleResult, TripSettings } from './types';
 
 const MAX_PLACES = 10;
@@ -123,6 +123,15 @@ export default function App() {
     }
     if (target.length > MAX_PLACES) {
       setError(`장소는 최대 ${MAX_PLACES}곳까지 계산할 수 있습니다.`);
+      return;
+    }
+    // 종료 시간이 출발 시간보다 빠르면 어떤 일정도 만들 수 없다 (조용히 전부 제외되는 것을 막는다)
+    const startMin = toMinutes(settings.startTime);
+    const endMin = toMinutes(settings.endTime);
+    if (startMin !== null && endMin !== null && endMin <= startMin) {
+      setError(
+        `희망 종료 시간(${settings.endTime})이 출발 시간(${settings.startTime})보다 빠릅니다. 종료 시간을 늦춰 주세요.`,
+      );
       return;
     }
     setCalculating(true);

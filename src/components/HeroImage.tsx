@@ -12,16 +12,25 @@ export function HeroImage() {
   const [progress, setProgress] = useState(0); // 0 = 완전히 보임, 1 = 완전히 사라짐
 
   useEffect(() => {
-    const onScroll = () => {
+    let frame = 0;
+    const measure = () => {
+      frame = 0;
       const h = ref.current?.offsetHeight ?? 1;
       // 히어로 높이의 85% 만큼 스크롤하면 완전히 사라지도록
       const p = Math.min(1, Math.max(0, window.scrollY / (h * 0.85)));
-      setProgress(p);
+      // 이미 사라진 뒤에는 상태를 더 바꾸지 않아 불필요한 리렌더를 막는다
+      setProgress((prev) => (Math.abs(prev - p) < 0.01 ? prev : p));
     };
-    onScroll();
+    // 스크롤마다 리렌더하지 않도록 프레임 단위로 묶는다
+    const onScroll = () => {
+      if (frame) return;
+      frame = window.requestAnimationFrame(measure);
+    };
+    measure();
     window.addEventListener('scroll', onScroll, { passive: true });
     window.addEventListener('resize', onScroll);
     return () => {
+      if (frame) window.cancelAnimationFrame(frame);
       window.removeEventListener('scroll', onScroll);
       window.removeEventListener('resize', onScroll);
     };

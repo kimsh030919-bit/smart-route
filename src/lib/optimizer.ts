@@ -11,8 +11,14 @@ import type {
   TripSettings,
   Warning,
 } from '../types';
-import { EXCLUSION_LABELS, compileConstraint, slotFor, type Compiled } from './businessHours';
-import { MODE_SPECS, buildMatrix, type TravelMatrix } from './travel';
+import {
+  EXCLUSION_LABELS,
+  compileConstraint,
+  effectiveHours,
+  slotFor,
+  type Compiled,
+} from './businessHours';
+import { MODE_SPECS, buildMatrix, haversineKm, type TravelMatrix } from './travel';
 import { WEEKDAY_LABELS, formatClock, formatDuration, toHHMM, toMinutes, weekdayOf } from './time';
 
 /**
@@ -394,7 +400,9 @@ export function optimizeSchedule(
   const mode = settings.mode;
   const weekday = weekdayOf(settings.date) ?? new Date().getDay();
   const startMinutes = toMinutes(settings.startTime) ?? 10 * 60;
-  const endLimit = toMinutes(settings.endTime) ?? 23 * 60;
+  const rawEndLimit = toMinutes(settings.endTime) ?? 23 * 60;
+  // 종료 시간이 출발 시간보다 빠르면(잘못 입력) 모든 장소가 조용히 제외되므로 하루 끝까지로 본다
+  const endLimit = rawEndLimit > startMinutes ? rawEndLimit : 24 * 60 - 1;
 
   const origin: Origin =
     settings.origin ??
@@ -474,10 +482,41 @@ export function optimizeSchedule(
 
   const feasible = stops.length === places.length && places.length > 0;
 
+  // 출발지가 방문 장소들과 너무 멀면, 그게 진짜 원인이므로 먼저 알린다
+  const nearestKm = places.length
+    ? Math.min(...places.map((p) => haversineKm(origin, p)))
+    : 0;
+  const originTooFar = nearestKm > 50;
+
   const warnings = buildWarnings(stops, excluded, totalWait, weekday);
+  if (originTooFar) {
+    warnings.unshift({
+      level: 'error',
+      title: `출발지가 방문 장소들과 ${Math.round(nearestKm)}km 떨어져 있습니다`,
+      message: `출발지 "${origin.name}"에서 가장 가까운 장소까지도 ${Math.round(
+        nearestKm,
+      )}km입니다. ${MODE_SPECS[mode].label} 기준 이동에만 ${formatDuration(
+        (nearestKm / MODE_SPECS[mode].speedKmh) * 60,
+      )} 걸려 영업시간 안에 도착하기 어렵습니다. 출발지가 올바른지 확인해 주세요.`,
+    });
+  }
   const suggestions = feasible
     ? []
-    : buildSuggestions(places, settings, excluded, options.searchAlternatives !== false);
+    : buildSuggestions(
+        places,
+        settings,
+        excluded,
+        // 출발지가 터무니없이 멀면 출발 시간을 바꿔도 소용없으므로 대안 탐색을 건너뛴다
+        !originTooFar && options.searchAlternatives !== false,
+      );
+  if (originTooFar) {
+    suggestions.unshift({
+      title: '출발지를 방문 장소 근처로 변경',
+      message: `지금 출발지(${origin.name})는 방문 장소들과 ${Math.round(
+        nearestKm,
+      )}km 떨어져 있습니다. 출발 지역을 장소들과 가까운 곳으로 바꾸면 일정이 만들어집니다.`,
+    });
+  }
 
   return {
     feasible,
@@ -590,8 +629,11 @@ function buildSuggestions(
 
   for (const ex of excluded) {
     const info = ex.place.business;
+    // 그 날짜에 실제로 적용되는 영업시간을 기준으로 안내한다 (요일별 설정 반영)
+    const eff = effectiveHours(info, weekday);
     if (ex.reason === 'closed_weekday') {
-      const openDays = [0, 1, 2, 3, 4, 5, 6].filter((d) => !info.closedWeekdays.includes(d));
+      // 요일별 설정까지 반영해 실제로 문을 여는 요일을 계산한다
+      const openDays = [0, 1, 2, 3, 4, 5, 6].filter((d) => !effectiveHours(info, d).closed);
       suggestions.push({
         title: `${ex.place.name} — 다른 날짜로 변경`,
         message: `${WEEKDAY_LABELS[weekday]}요일은 휴무입니다. ${openDays
@@ -604,7 +646,7 @@ function buildSuggestions(
         message: '임시 휴무 표시를 해제하거나, 이 장소를 일정에서 제외하고 다시 계산해 보세요.',
       });
     } else if (ex.reason === 'break_conflict') {
-      const br = info.breaks[0];
+      const br = eff.breaks[0];
       suggestions.push({
         title: `${ex.place.name} — 브레이크 타임 회피`,
         message: br
@@ -614,8 +656,8 @@ function buildSuggestions(
     } else if (ex.reason === 'arrive_after_close' || ex.reason === 'after_last_order') {
       suggestions.push({
         title: `${ex.place.name} — 더 일찍 출발`,
-        message: `영업 종료(${info.close ?? '확인 필요'})${
-          info.lastOrder ? ` · 라스트 오더(${info.lastOrder})` : ''
+        message: `영업 종료(${eff.close ?? '확인 필요'})${
+          eff.lastOrder ? ` · 라스트 오더(${eff.lastOrder})` : ''
         } 전에 도착하려면 출발 시간을 앞당기거나, 앞쪽 장소의 체류시간을 줄여야 합니다.`,
       });
     } else if (ex.reason === 'stay_too_long') {
